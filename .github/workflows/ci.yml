@@ -53,8 +53,5 @@ jobs:
         id: test-action
         uses: ./
         with:
-          milliseconds: 1000
-
-      - name: Print Output
-        id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+          subject_digest: 'sha1:babca52ab0c93ae16539e5923cb0d7403b9a093b'
+          subject_name: 'subject'
