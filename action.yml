@@ -1,18 +1,24 @@
-name: 'The name of your action here'
+name: 'Generate Build Provenance'
 description: 'Provide a description here'
-author: 'Your name or organization here'
+author: 'GitHub'
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
-    required: true
-    default: '1000'
-
-# Define your outputs here.
-outputs:
-  time:
-    description: 'Your output description here'
+  subject_path:
+    description: >
+      Path to the artifact for which provenance will be generated. Must specify
+      exactly one of "subject_path" or "subect_digest".
+    required: false
+  subject_digest:
+    description: >
+      Digest of the subject for which provenance will be generated. Must be in
+      the form "algorithm:hex_digest" (e.g. "sha256:abc123..."). Must specify
+      exactly one of "subject_path" or "subject_digest".
+    required: false
+  subject_name:
+    description: >
+      Subject name as it should appear in the provenance statement. Required
+      unless "subject_path" is specified, in which case it will be inferred
+      from the path.
 
 runs:
   using: node20
