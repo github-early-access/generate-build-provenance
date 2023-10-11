@@ -27,7 +27,7 @@ describe('action', () => {
       getInputMock.mockImplementation((name: string): string => {
         switch (name) {
           case 'subject-digest':
-            return 'sha1:babca52ab0c93ae16539e5923cb0d7403b9a093b'
+            return 'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
           case 'subject-name':
             return 'subject'
           default:

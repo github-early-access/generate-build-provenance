@@ -25775,24 +25775,10 @@ const getSubjectFromPath = async (subjectPath, subjectName) => {
 // Returns the subject specified by the digest of a file. The digest is returned
 // along with the subject's name.
 const getSubjectFromDigest = (subjectDigest, subjectName) => {
-    const parts = subjectDigest.split(':');
-    if (parts.length !== 2) {
-        throw new Error('subject-digest must be in the format <algorithm>:<digest>');
+    if (!subjectDigest.match(/^sha256:[A-Za-z0-9]{64}$/)) {
+        throw new Error('subject-digest must be in the format "sha256:<hex-digest>"');
     }
-    const [alg, digest] = parts;
-    switch (alg) {
-        case 'sha1':
-            validateDigestLength(digest, 40);
-            break;
-        case 'sha256':
-            validateDigestLength(digest, 64);
-            break;
-        case 'sha512':
-            validateDigestLength(digest, 128);
-            break;
-        default:
-            throw new Error('subject-digest must be prefixed with a supported algorithm (sha1, sha256, sha512)');
-    }
+    const [alg, digest] = subjectDigest.split(':');
     return {
         name: subjectName,
         digest: { [alg]: digest }
@@ -25809,12 +25795,6 @@ const digestFile = async (algorithm, filePath) => {
             .pipe(hash)
             .once('finish', () => resolve(hash.read()));
     });
-};
-// Ensure the digest is a valid hex string of the correct length
-const validateDigestLength = (digest, length) => {
-    if (!digest.match(/^[A-Fa-f0-9]+$/) || digest.length !== length) {
-        throw new Error(`digest must be a ${length} character hex string`);
-    }
 };
 
 
