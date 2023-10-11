@@ -3,22 +3,22 @@ description: 'Provide a description here'
 author: 'GitHub'
 
 inputs:
-  subject_path:
+  subject-path:
     description: >
       Path to the artifact for which provenance will be generated. Must specify
-      exactly one of "subject_path" or "subect_digest".
+      exactly one of "subject-path" or "subect-digest".
     required: false
-  subject_digest:
+  subject-digest:
     description: >
       Digest of the subject for which provenance will be generated. Must be in
       the form "algorithm:hex_digest" (e.g. "sha256:abc123..."). Must specify
-      exactly one of "subject_path" or "subject_digest".
+      exactly one of "subject-path" or "subject-digest".
     required: false
-  subject_name:
+  subject-name:
     description: >
       Subject name as it should appear in the provenance statement. Required
-      unless "subject_path" is specified, in which case it will be inferred
-      from the path.
+      unless "subject-path" is specified, in which case it will be inferred from
+      the path.
 
 runs:
   using: node20

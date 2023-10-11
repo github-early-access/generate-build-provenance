@@ -12,6 +12,7 @@ import * as main from '../src/main'
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug')
 const getInputMock = jest.spyOn(core, 'getInput')
+const setFailedMock = jest.spyOn(core, 'setFailed')
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
@@ -21,28 +22,46 @@ describe('action', () => {
     jest.clearAllMocks()
   })
 
-  it('invokes the action', async () => {
-    // Set the action's inputs as return values from core.getInput()
-    getInputMock.mockImplementation((name: string): string => {
-      switch (name) {
-        case 'subject_digest':
-          return 'sha1:babca52ab0c93ae16539e5923cb0d7403b9a093b'
-        case 'subject_name':
-          return 'subject'
-        default:
-          return ''
-      }
+  describe('when a subject digest is provided', () => {
+    beforeEach(() => {
+      getInputMock.mockImplementation((name: string): string => {
+        switch (name) {
+          case 'subject-digest':
+            return 'sha1:babca52ab0c93ae16539e5923cb0d7403b9a093b'
+          case 'subject-name':
+            return 'subject'
+          default:
+            return ''
+        }
+      })
     })
 
-    await main.run()
-    expect(runMock).toHaveReturned()
+    it('invokes the action w/o error', async () => {
+      await main.run()
 
-    // Verify that all of the core library functions were called correctly
-    expect(debugMock).toHaveBeenNthCalledWith(1, 'subject_path ')
-    expect(debugMock).toHaveBeenNthCalledWith(
-      2,
-      'subject_digest sha1:babca52ab0c93ae16539e5923cb0d7403b9a093b'
-    )
-    expect(debugMock).toHaveBeenNthCalledWith(3, 'subject_name subject')
+      expect(runMock).toHaveReturned()
+      expect(debugMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('https://in-toto.io/Statement/v1')
+      )
+      expect(setFailedMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when no inputs are provided', () => {
+    beforeEach(() => {
+      getInputMock.mockImplementation(() => '')
+    })
+
+    it('sets a failed status', async () => {
+      await main.run()
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /one of subject-path or subject-digest must be provided/i
+        )
+      )
+    })
   })
 })

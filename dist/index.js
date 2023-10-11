@@ -2753,20 +2753,18 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(186));
+const provenance_1 = __nccwpck_require__(38);
+const subject_1 = __nccwpck_require__(206);
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 async function run() {
     try {
-        const subjectPath = core.getInput('subject_path');
-        const subjectDigest = core.getInput('subject_digest');
-        const subjectName = core.getInput('subject_name');
-        // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-        core.debug(`subject_path ${subjectPath}`);
-        core.debug(`subject_digest ${subjectDigest}`);
-        core.debug(`subject_name ${subjectName}`);
-        core.debug(new Date().toTimeString());
+        // Calculate subject from inputs and generate provenance
+        const subject = await (0, subject_1.subjectFromInputs)();
+        const provenance = (0, provenance_1.generateProvenance)(subject);
+        core.debug(JSON.stringify(provenance));
     }
     catch (error) {
         // Fail the workflow run if an error occurs
@@ -2775,6 +2773,196 @@ async function run() {
     }
 }
 exports.run = run;
+
+
+/***/ }),
+
+/***/ 38:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.generateProvenance = void 0;
+const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
+const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
+const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
+const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
+const generateProvenance = (subject) => {
+    const { env } = process;
+    const workflow = env.GITHUB_WORKFLOW_REF || /* istanbul ignore next */ '';
+    // Split just the path and ref from the workflow string.
+    // owner/repo/.github/workflows/main.yml@main =>
+    //   [.github/workflows/main.yml, main]
+    const [workflowPath, workflowRef] = workflow
+        .replace(`${env.GITHUB_REPOSITORY}/`, '')
+        .split('@');
+    return {
+        _type: INTOTO_STATEMENT_V1_TYPE,
+        subject,
+        predicateType: SLSA_PREDICATE_V1_TYPE,
+        predicate: {
+            buildDefinition: {
+                buildType: GITHUB_BUILD_TYPE,
+                externalParameters: {
+                    workflow: {
+                        ref: workflowRef,
+                        repository: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}`,
+                        path: workflowPath
+                    }
+                },
+                internalParameters: {
+                    github: {
+                        event_name: env.GITHUB_EVENT_NAME,
+                        repository_id: env.GITHUB_REPOSITORY_ID,
+                        repository_owner_id: env.GITHUB_REPOSITORY_OWNER_ID
+                    }
+                },
+                resolvedDependencies: [
+                    {
+                        uri: `git+${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}@${env.GITHUB_REF}`,
+                        digest: {
+                            gitCommit: env.GITHUB_SHA
+                        }
+                    }
+                ]
+            },
+            runDetails: {
+                builder: {
+                    id: `${GITHUB_BUILDER_ID_PREFIX}/${env.RUNNER_ENVIRONMENT}`
+                },
+                metadata: {
+                    invocationId: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT}`
+                }
+            }
+        }
+    };
+};
+exports.generateProvenance = generateProvenance;
+
+
+/***/ }),
+
+/***/ 206:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.subjectFromInputs = void 0;
+const core = __importStar(__nccwpck_require__(186));
+const crypto_1 = __importDefault(__nccwpck_require__(113));
+const fs_1 = __importDefault(__nccwpck_require__(147));
+const path_1 = __importDefault(__nccwpck_require__(17));
+const DIGEST_ALGORITHM = 'sha256';
+// Returns the subject specified by the action's inputs. The subject may be
+// specified as a path to a file or as a digest. If a path is provided, the
+// file's digest is calculated and returned along with the subject's name. If a
+// digest is provided, the name must also be provided.
+const subjectFromInputs = async () => {
+    const subjectPath = core.getInput('subject-path', { required: false });
+    const subjectDigest = core.getInput('subject-digest', { required: false });
+    const subjectName = core.getInput('subject-name', { required: false });
+    if (!subjectPath && !subjectDigest) {
+        throw new Error('One of subject-path or subject-digest must be provided');
+    }
+    if (subjectPath && subjectDigest) {
+        throw new Error('Only one of subject-path or subject-digest may be provided');
+    }
+    if (subjectDigest && !subjectName) {
+        throw new Error('subject-name must be provided when using subject-digest');
+    }
+    if (subjectPath) {
+        return getSubjectFromPath(subjectPath, subjectName);
+    }
+    else {
+        return getSubjectFromDigest(subjectDigest, subjectName);
+    }
+};
+exports.subjectFromInputs = subjectFromInputs;
+// Returns the subject specified by the path to a file. The file's digest is
+// calculated and returned along with the subject's name.
+const getSubjectFromPath = async (subjectPath, subjectName) => {
+    if (!fs_1.default.existsSync(subjectPath)) {
+        throw new Error(`Could not find subject at path ${subjectPath}`);
+    }
+    const name = subjectName || path_1.default.parse(subjectPath).base;
+    const digest = await digestFile(DIGEST_ALGORITHM, subjectPath);
+    return {
+        name,
+        digest: { [DIGEST_ALGORITHM]: digest }
+    };
+};
+// Returns the subject specified by the digest of a file. The digest is returned
+// along with the subject's name.
+const getSubjectFromDigest = (subjectDigest, subjectName) => {
+    const parts = subjectDigest.split(':');
+    if (parts.length !== 2) {
+        throw new Error('subject-digest must be in the format <algorithm>:<digest>');
+    }
+    const [alg, digest] = parts;
+    switch (alg) {
+        case 'sha1':
+            validateDigestLength(digest, 40);
+            break;
+        case 'sha256':
+            validateDigestLength(digest, 64);
+            break;
+        case 'sha512':
+            validateDigestLength(digest, 128);
+            break;
+        default:
+            throw new Error('subject-digest must be prefixed with a supported algorithm (sha1, sha256, sha512)');
+    }
+    return {
+        name: subjectName,
+        digest: { [alg]: digest }
+    };
+};
+// Calculates the digest of a file using the specified algorithm. The file is
+// streamed into the digest function to avoid loading the entire file into
+// memory. The returned digest is a hex string.
+const digestFile = async (algorithm, filePath) => {
+    return new Promise((resolve, reject) => {
+        const hash = crypto_1.default.createHash(algorithm).setEncoding('hex');
+        fs_1.default.createReadStream(filePath)
+            .once('error', reject)
+            .pipe(hash)
+            .once('finish', () => resolve(hash.read()));
+    });
+};
+// Ensure the digest is a valid hex string of the correct length
+const validateDigestLength = (digest, length) => {
+    if (!digest.match(/^[A-Fa-f0-9]+$/) || digest.length !== length) {
+        throw new Error(`digest must be a ${length} character hex string`);
+    }
+};
 
 
 /***/ }),

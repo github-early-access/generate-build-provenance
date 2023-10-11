@@ -1,4 +1,6 @@
 import * as core from '@actions/core'
+import { generateProvenance } from './provenance'
+import { subjectFromInputs } from './subject'
 
 /**
  * The main function for the action.
@@ -6,15 +8,10 @@ import * as core from '@actions/core'
  */
 export async function run(): Promise<void> {
   try {
-    const subjectPath: string = core.getInput('subject_path')
-    const subjectDigest: string = core.getInput('subject_digest')
-    const subjectName: string = core.getInput('subject_name')
-
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`subject_path ${subjectPath}`)
-    core.debug(`subject_digest ${subjectDigest}`)
-    core.debug(`subject_name ${subjectName}`)
-    core.debug(new Date().toTimeString())
+    // Calculate subject from inputs and generate provenance
+    const subject = await subjectFromInputs()
+    const provenance = generateProvenance(subject)
+    core.debug(JSON.stringify(provenance))
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)

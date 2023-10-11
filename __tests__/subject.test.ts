@@ -210,7 +210,7 @@ describe('subjectFromInputs', () => {
 
     afterEach(async () => {
       // Clean-up temp directory
-      await fs.rmdir(dir, { recursive: true })
+      await fs.rm(dir, { recursive: true })
     })
 
     describe('when no name is provided', () => {
