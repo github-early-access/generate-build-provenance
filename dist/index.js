@@ -58141,7 +58141,7 @@ async function run() {
     try {
         // Calculate subject from inputs and generate provenance
         const subject = await (0, subject_1.subjectFromInputs)();
-        const provenance = (0, provenance_1.generateProvenance)(subject);
+        const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
         core.debug(JSON.stringify(provenance));
         const bundle = await (0, sign_1.signProvenance)(provenance, visibility);
         // TODO: Replace w/ artifact upload
@@ -58169,12 +58169,11 @@ const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
 const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
 const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
 const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
-const generateProvenance = (subject) => {
-    const { env } = process;
+const generateProvenance = (subject, env) => {
     const workflow = env.GITHUB_WORKFLOW_REF || /* istanbul ignore next */ '';
     // Split just the path and ref from the workflow string.
     // owner/repo/.github/workflows/main.yml@main =>
-    //   [.github/workflows/main.yml, main]
+    //   .github/workflows/main.yml, main
     const [workflowPath, workflowRef] = workflow
         .replace(`${env.GITHUB_REPOSITORY}/`, '')
         .split('@');

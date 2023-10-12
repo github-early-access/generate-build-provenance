@@ -7,13 +7,15 @@ const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner'
 const GITHUB_BUILD_TYPE =
   'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1'
 
-export const generateProvenance = (subject: Subject): object => {
-  const { env } = process
+export const generateProvenance = (
+  subject: Subject,
+  env: NodeJS.ProcessEnv
+): object => {
   const workflow = env.GITHUB_WORKFLOW_REF || /* istanbul ignore next */ ''
 
   // Split just the path and ref from the workflow string.
   // owner/repo/.github/workflows/main.yml@main =>
-  //   [.github/workflows/main.yml, main]
+  //   .github/workflows/main.yml, main
   const [workflowPath, workflowRef] = workflow
     .replace(`${env.GITHUB_REPOSITORY}/`, '')
     .split('@')

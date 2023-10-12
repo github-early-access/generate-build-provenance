@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
   try {
     // Calculate subject from inputs and generate provenance
     const subject = await subjectFromInputs()
-    const provenance = generateProvenance(subject)
+    const provenance = generateProvenance(subject, process.env)
     core.debug(JSON.stringify(provenance))
 
     const bundle = await signProvenance(provenance, visibility)
