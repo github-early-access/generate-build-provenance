@@ -1,5 +1,5 @@
+import { SerializedBundle, bundleToJSON } from '@sigstore/bundle'
 import {
-  Bundle,
   BundleBuilder,
   CIContextProvider,
   DSSEBundleBuilder,
@@ -44,7 +44,7 @@ const SIGSTORE_INTERNAL_OPTS: SignOptions = {
 export const signProvenance = async (
   provenance: object,
   visibility: Visibility
-): Promise<Bundle> => {
+): Promise<SerializedBundle> => {
   const opts =
     visibility === 'public' ? SIGSTORE_PUBLIC_GOOD_OPTS : SIGSTORE_INTERNAL_OPTS
 
@@ -54,7 +54,9 @@ export const signProvenance = async (
     data: Buffer.from(JSON.stringify(provenance)),
     type: INTOTO_PAYLOAD_TYPE
   }
-  return bundler.create(artifact)
+
+  const bundle = await bundler.create(artifact)
+  return bundleToJSON(bundle)
 }
 
 // Assembles the Sigstore bundle builder with the appropriate options

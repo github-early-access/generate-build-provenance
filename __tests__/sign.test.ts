@@ -1,5 +1,4 @@
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
-import assert from 'assert'
 import nock from 'nock'
 import {
   FULCIO_INTERNAL_URL,
@@ -67,11 +66,8 @@ describe('signProvenance', () => {
       )
 
       // Should have a certificate
-      assert(
-        bundle.verificationMaterial.content.$case === 'x509CertificateChain'
-      )
       expect(
-        bundle.verificationMaterial.content.x509CertificateChain.certificates
+        bundle.verificationMaterial.x509CertificateChain?.certificates
       ).toHaveLength(1)
 
       // Should have one tlog entry
@@ -83,15 +79,14 @@ describe('signProvenance', () => {
       ).toHaveLength(0)
 
       // Should have a signature
-      assert(bundle.content.$case === 'dsseEnvelope')
-      expect(bundle.content.dsseEnvelope.signatures).toHaveLength(1)
+      expect(bundle.dsseEnvelope?.signatures).toHaveLength(1)
 
       // Should contain the provenance
-      expect(bundle.content.dsseEnvelope.payloadType).toEqual(
+      expect(bundle.dsseEnvelope?.payloadType).toEqual(
         'application/vnd.in-toto+json'
       )
-      expect(bundle.content.dsseEnvelope.payload).toEqual(
-        Buffer.from(JSON.stringify(provenance))
+      expect(bundle.dsseEnvelope?.payload).toEqual(
+        Buffer.from(JSON.stringify(provenance)).toString('base64')
       )
     })
   })
@@ -112,11 +107,8 @@ describe('signProvenance', () => {
       )
 
       // Should have a certificate
-      assert(
-        bundle.verificationMaterial.content.$case === 'x509CertificateChain'
-      )
       expect(
-        bundle.verificationMaterial.content.x509CertificateChain.certificates
+        bundle.verificationMaterial.x509CertificateChain?.certificates
       ).toHaveLength(1)
 
       // Should have zero tlog entriies
@@ -128,15 +120,14 @@ describe('signProvenance', () => {
       ).toHaveLength(1)
 
       // Should have a signature
-      assert(bundle.content.$case === 'dsseEnvelope')
-      expect(bundle.content.dsseEnvelope.signatures).toHaveLength(1)
+      expect(bundle.dsseEnvelope?.signatures).toHaveLength(1)
 
       // Should contain the provenance
-      expect(bundle.content.dsseEnvelope.payloadType).toEqual(
+      expect(bundle.dsseEnvelope?.payloadType).toEqual(
         'application/vnd.in-toto+json'
       )
-      expect(bundle.content.dsseEnvelope.payload).toEqual(
-        Buffer.from(JSON.stringify(provenance))
+      expect(bundle.dsseEnvelope?.payload).toEqual(
+        Buffer.from(JSON.stringify(provenance)).toString('base64')
       )
     })
   })
