@@ -27,6 +27,8 @@ const setFailedMock = jest.spyOn(core, 'setFailed')
 const runMock = jest.spyOn(main, 'run')
 
 describe('action', () => {
+  // Capture original environment variables and GitHub context so we can restore
+  // them after each test
   const originalEnv = process.env
   const originalContext = { ...github.context }
 
@@ -48,6 +50,10 @@ describe('action', () => {
       .query({ audience: 'sigstore' })
       .reply(200, { value: oidcToken })
 
+    nock('https://api.github.com')
+      .post(/^\/repos\/.*\/.*\/attestations$/)
+      .reply(201)
+
     process.env = {
       ...originalEnv,
       ACTIONS_ID_TOKEN_REQUEST_URL: tokenURL,
@@ -64,23 +70,24 @@ describe('action', () => {
   })
 
   describe('when the repository is private', () => {
+    const inputs = {
+      'subject-digest':
+        'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+      'subject-name': 'subject',
+      'github-token': 'gh-token'
+    }
+
     beforeEach(async () => {
-      // Set the repository visibility to private.
-      setGHContext({ payload: { repository: { visibility: 'private' } } })
+      // Set the GH context with private repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'private' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      getInputMock.mockImplementation(mockInput(inputs))
 
       await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
       await mockTSA({ baseURL: TSA_INTERNAL_URL })
-
-      getInputMock.mockImplementation((name: string): string => {
-        switch (name) {
-          case 'subject-digest':
-            return 'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
-          case 'subject-name':
-            return 'subject'
-          default:
-            return ''
-        }
-      })
     })
 
     it('invokes the action w/o error', async () => {
@@ -100,23 +107,25 @@ describe('action', () => {
   })
 
   describe('when the repository is public', () => {
+    const inputs = {
+      'subject-digest':
+        'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+      'subject-name': 'subject',
+      'github-token': 'gh-token'
+    }
+
     beforeEach(async () => {
-      // Set the repository visibility to public.
-      setGHContext({ payload: { repository: { visibility: 'public' } } })
+      // Set the GH context with public repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'public' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      // Mock the action's inputs
+      getInputMock.mockImplementation(mockInput(inputs))
 
       await mockFulcio({ baseURL: FULCIO_PUBLIC_GOOD_URL, strict: false })
       await mockRekor({ baseURL: REKOR_PUBLIC_GOOD_URL })
-
-      getInputMock.mockImplementation((name: string): string => {
-        switch (name) {
-          case 'subject-digest':
-            return 'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'
-          case 'subject-name':
-            return 'subject'
-          default:
-            return ''
-        }
-      })
     })
 
     it('invokes the action w/o error', async () => {
@@ -152,6 +161,15 @@ describe('action', () => {
     })
   })
 })
+
+function mockInput(inputs: Record<string, string>): typeof core.getInput {
+  return (name: string): string => {
+    if (name in inputs) {
+      return inputs[name]
+    }
+    return ''
+  }
+}
 
 // Stubbing the GitHub context is a bit tricky. We need to use
 // `Object.defineProperty` because `github.context` is read-only.

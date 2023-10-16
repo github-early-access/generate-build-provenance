@@ -80,11 +80,13 @@
     "@actions/core": "^1.10.1",
     "@actions/github": "^6.0.0",
     "@sigstore/bundle": "^2.1.0",
-    "@sigstore/sign": "^2.1.0"
+    "@sigstore/sign": "^2.1.0",
+    "make-fetch-happen": "^13.0.0"
   },
   "devDependencies": {
     "@sigstore/mock": "^0.6.0",
     "@types/jest": "^29.5.5",
+    "@types/make-fetch-happen": "^10.0.2",
     "@types/node": "^20.8.6",
     "@typescript-eslint/eslint-plugin": "^6.7.5",
     "@typescript-eslint/parser": "^6.7.5",

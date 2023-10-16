@@ -58126,6 +58126,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 const provenance_1 = __nccwpck_require__(38);
 const sign_1 = __nccwpck_require__(6110);
+const store_1 = __nccwpck_require__(9425);
 const subject_1 = __nccwpck_require__(5206);
 /**
  * The main function for the action.
@@ -58146,6 +58147,7 @@ async function run() {
         const bundle = await (0, sign_1.signProvenance)(provenance, visibility);
         // TODO: Replace w/ artifact upload
         core.debug(JSON.stringify(bundle));
+        await (0, store_1.writeAttestation)(bundle, core.getInput('github-token'));
     }
     catch (error) {
         // Fail the workflow run if an error occurs
@@ -58283,6 +58285,62 @@ const initBundleBuilder = (opts) => {
     }
     return new sign_1.DSSEBundleBuilder({ signer, witnesses });
 };
+
+
+/***/ }),
+
+/***/ 9425:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.writeAttestation = void 0;
+const github = __importStar(__nccwpck_require__(5438));
+const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
+const CREATE_ATTESTATION_REQUEST = 'POST /repos/{owner}/{repo}/attestations';
+const writeAttestation = async (attestation, token) => {
+    const octokit = github.getOctokit(token, { request: { fetch: make_fetch_happen_1.default } });
+    try {
+        await octokit.request(CREATE_ATTESTATION_REQUEST, {
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            data: { bundle: attestation }
+        });
+    }
+    catch (err) {
+        /* istanbul ignore next */
+        const message = err instanceof Error ? err.message : err;
+        throw new Error(`Failed to persist attestation: ${message}`);
+    }
+};
+exports.writeAttestation = writeAttestation;
 
 
 /***/ }),

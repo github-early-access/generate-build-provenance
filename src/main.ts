@@ -2,6 +2,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { generateProvenance } from './provenance'
 import { signProvenance } from './sign'
+import { writeAttestation } from './store'
 import { subjectFromInputs } from './subject'
 
 /**
@@ -26,6 +27,8 @@ export async function run(): Promise<void> {
     const bundle = await signProvenance(provenance, visibility)
     // TODO: Replace w/ artifact upload
     core.debug(JSON.stringify(bundle))
+
+    await writeAttestation(bundle, core.getInput('github-token'))
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
