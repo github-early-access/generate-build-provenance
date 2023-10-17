@@ -22,13 +22,13 @@ describe('writeAttestation', () => {
       nock('https://api.github.com')
         .matchHeader('authorization', `token ${token}`)
         .post('/repos/foo/bar/attestations', { bundle: attestation })
-        .reply(201)
+        .reply(201, { attestation_id: '123' })
     })
 
     it('persists the attestation', async () => {
-      await expect(
-        writeAttestation(attestation, token)
-      ).resolves.toBeUndefined()
+      await expect(writeAttestation(attestation, token)).resolves.toEqual(
+        'https://github.com/foo/bar/attestations/123'
+      )
     })
   })
 

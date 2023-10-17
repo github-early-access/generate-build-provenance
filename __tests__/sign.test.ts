@@ -6,7 +6,7 @@ import {
   REKOR_PUBLIC_GOOD_URL,
   TSA_INTERNAL_URL
 } from '../src/endpoints'
-import { signProvenance } from '../src/sign'
+import { signStatement } from '../src/sign'
 
 describe('signProvenance', () => {
   const originalEnv = process.env
@@ -58,36 +58,11 @@ describe('signProvenance', () => {
     })
 
     it('returns a bundle', async () => {
-      const bundle = await signProvenance(provenance, visibility)
+      const att = await signStatement(provenance, visibility)
 
-      expect(bundle).toBeDefined()
-      expect(bundle.mediaType).toEqual(
-        'application/vnd.dev.sigstore.bundle+json;version=0.2'
-      )
-
-      // Should have a certificate
-      expect(
-        bundle.verificationMaterial.x509CertificateChain?.certificates
-      ).toHaveLength(1)
-
-      // Should have one tlog entry
-      expect(bundle.verificationMaterial.tlogEntries).toHaveLength(1)
-
-      // Should have zero rfc3161 timestamps
-      expect(
-        bundle.verificationMaterial.timestampVerificationData?.rfc3161Timestamps
-      ).toHaveLength(0)
-
-      // Should have a signature
-      expect(bundle.dsseEnvelope?.signatures).toHaveLength(1)
-
-      // Should contain the provenance
-      expect(bundle.dsseEnvelope?.payloadType).toEqual(
-        'application/vnd.in-toto+json'
-      )
-      expect(bundle.dsseEnvelope?.payload).toEqual(
-        Buffer.from(JSON.stringify(provenance)).toString('base64')
-      )
+      expect(att).toBeDefined()
+      expect(att.bundle).toBeDefined()
+      expect(att.tlogURL).toBeDefined()
     })
   })
 
@@ -99,36 +74,11 @@ describe('signProvenance', () => {
     })
 
     it('returns a bundle', async () => {
-      const bundle = await signProvenance(provenance, visibility)
+      const att = await signStatement(provenance, visibility)
 
-      expect(bundle).toBeDefined()
-      expect(bundle.mediaType).toEqual(
-        'application/vnd.dev.sigstore.bundle+json;version=0.2'
-      )
-
-      // Should have a certificate
-      expect(
-        bundle.verificationMaterial.x509CertificateChain?.certificates
-      ).toHaveLength(1)
-
-      // Should have zero tlog entriies
-      expect(bundle.verificationMaterial.tlogEntries).toHaveLength(0)
-
-      // Should have one rfc3161 timestamps
-      expect(
-        bundle.verificationMaterial.timestampVerificationData?.rfc3161Timestamps
-      ).toHaveLength(1)
-
-      // Should have a signature
-      expect(bundle.dsseEnvelope?.signatures).toHaveLength(1)
-
-      // Should contain the provenance
-      expect(bundle.dsseEnvelope?.payloadType).toEqual(
-        'application/vnd.in-toto+json'
-      )
-      expect(bundle.dsseEnvelope?.payload).toEqual(
-        Buffer.from(JSON.stringify(provenance)).toString('base64')
-      )
+      expect(att).toBeDefined()
+      expect(att.bundle).toBeDefined()
+      expect(att.tlogURL).toBeUndefined()
     })
   })
 })

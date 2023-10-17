@@ -1,4 +1,4 @@
-import { SerializedBundle, bundleToJSON } from '@sigstore/bundle'
+import { bundleToJSON } from '@sigstore/bundle'
 import {
   BundleBuilder,
   CIContextProvider,
@@ -12,6 +12,7 @@ import {
   FULCIO_INTERNAL_URL,
   FULCIO_PUBLIC_GOOD_URL,
   REKOR_PUBLIC_GOOD_URL,
+  SEARCH_PUBLIC_GOOD_URL,
   TSA_INTERNAL_URL
 } from './endpoints'
 
@@ -29,6 +30,11 @@ type SignOptions = {
 
 type Visibility = 'public' | 'private'
 
+type Attestation = {
+  bundle: unknown
+  tlogURL?: string
+}
+
 const SIGSTORE_PUBLIC_GOOD_OPTS: SignOptions = {
   fulcioURL: FULCIO_PUBLIC_GOOD_URL,
   rekorURL: REKOR_PUBLIC_GOOD_URL
@@ -39,24 +45,34 @@ const SIGSTORE_INTERNAL_OPTS: SignOptions = {
   tsaServerURL: TSA_INTERNAL_URL
 }
 
-// Signs the provided provenance with Sigstore. The visibility argument
+// Signs the provided intoto statement with Sigstore. The visibility argument
 // determines which Sigstore instance is used to sign the provenance.
-export const signProvenance = async (
-  provenance: object,
+export const signStatement = async (
+  statement: unknown,
   visibility: Visibility
-): Promise<SerializedBundle> => {
+): Promise<Attestation> => {
   const opts =
     visibility === 'public' ? SIGSTORE_PUBLIC_GOOD_OPTS : SIGSTORE_INTERNAL_OPTS
 
-  const bundler = initBundleBuilder(opts)
-
   const artifact = {
-    data: Buffer.from(JSON.stringify(provenance)),
+    data: Buffer.from(JSON.stringify(statement)),
     type: INTOTO_PAYLOAD_TYPE
   }
 
-  const bundle = await bundler.create(artifact)
-  return bundleToJSON(bundle)
+  // Sign the statement and build the bundle
+  const bundle = await initBundleBuilder(opts).create(artifact)
+
+  // Determine if we can provide a link to the transparency log
+  let tlogURL: string | undefined
+  const tlogEntries = bundle.verificationMaterial.tlogEntries
+  if (visibility === 'public' && tlogEntries.length > 0) {
+    tlogURL = `${SEARCH_PUBLIC_GOOD_URL}?logIndex=${tlogEntries[0].logIndex}`
+  }
+
+  return {
+    bundle: bundleToJSON(bundle),
+    tlogURL
+  }
 }
 
 // Assembles the Sigstore bundle builder with the appropriate options

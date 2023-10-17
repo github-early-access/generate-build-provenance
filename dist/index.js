@@ -58103,9 +58103,10 @@ function wrappy (fn, cb) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TSA_INTERNAL_URL = exports.FULCIO_INTERNAL_URL = exports.REKOR_PUBLIC_GOOD_URL = exports.FULCIO_PUBLIC_GOOD_URL = void 0;
+exports.TSA_INTERNAL_URL = exports.FULCIO_INTERNAL_URL = exports.SEARCH_PUBLIC_GOOD_URL = exports.REKOR_PUBLIC_GOOD_URL = exports.FULCIO_PUBLIC_GOOD_URL = void 0;
 exports.FULCIO_PUBLIC_GOOD_URL = 'https://fulcio.sigstore.dev';
 exports.REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
+exports.SEARCH_PUBLIC_GOOD_URL = 'https://search.sigstore.dev';
 exports.FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
 exports.TSA_INTERNAL_URL = 'https://timestamp-authority.githubapp.com';
 
@@ -58164,15 +58165,14 @@ async function run() {
         const subject = await (0, subject_1.subjectFromInputs)();
         const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
         core.debug(JSON.stringify(provenance));
-        const bundle = await (0, sign_1.signProvenance)(provenance, visibility);
+        const attestation = await (0, sign_1.signStatement)(provenance, visibility);
         // TODO: Replace w/ artifact upload
-        core.debug(JSON.stringify(bundle));
-        await (0, store_1.writeAttestation)(bundle, core.getInput('github-token'));
+        core.debug(JSON.stringify(attestation));
+        await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
     }
-    catch (error) {
+    catch (err) {
         // Fail the workflow run if an error occurs
-        if (error instanceof Error)
-            core.setFailed(error.message);
+        core.setFailed(err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`);
     }
 }
 exports.run = run;
@@ -58251,7 +58251,7 @@ exports.generateProvenance = generateProvenance;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.signProvenance = void 0;
+exports.signStatement = void 0;
 const bundle_1 = __nccwpck_require__(9715);
 const sign_1 = __nccwpck_require__(2071);
 const endpoints_1 = __nccwpck_require__(9112);
@@ -58267,19 +58267,28 @@ const SIGSTORE_INTERNAL_OPTS = {
     fulcioURL: endpoints_1.FULCIO_INTERNAL_URL,
     tsaServerURL: endpoints_1.TSA_INTERNAL_URL
 };
-// Signs the provided provenance with Sigstore. The visibility argument
+// Signs the provided intoto statement with Sigstore. The visibility argument
 // determines which Sigstore instance is used to sign the provenance.
-const signProvenance = async (provenance, visibility) => {
+const signStatement = async (statement, visibility) => {
     const opts = visibility === 'public' ? SIGSTORE_PUBLIC_GOOD_OPTS : SIGSTORE_INTERNAL_OPTS;
-    const bundler = initBundleBuilder(opts);
     const artifact = {
-        data: Buffer.from(JSON.stringify(provenance)),
+        data: Buffer.from(JSON.stringify(statement)),
         type: INTOTO_PAYLOAD_TYPE
     };
-    const bundle = await bundler.create(artifact);
-    return (0, bundle_1.bundleToJSON)(bundle);
+    // Sign the statement and build the bundle
+    const bundle = await initBundleBuilder(opts).create(artifact);
+    // Determine if we can provide a link to the transparency log
+    let tlogURL;
+    const tlogEntries = bundle.verificationMaterial.tlogEntries;
+    if (visibility === 'public' && tlogEntries.length > 0) {
+        tlogURL = `${endpoints_1.SEARCH_PUBLIC_GOOD_URL}?logIndex=${tlogEntries[0].logIndex}`;
+    }
+    return {
+        bundle: (0, bundle_1.bundleToJSON)(bundle),
+        tlogURL
+    };
 };
-exports.signProvenance = signProvenance;
+exports.signStatement = signStatement;
 // Assembles the Sigstore bundle builder with the appropriate options
 const initBundleBuilder = (opts) => {
     const witnesses = [];
@@ -58345,14 +58354,18 @@ exports.writeAttestation = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
 const CREATE_ATTESTATION_REQUEST = 'POST /repos/{owner}/{repo}/attestations';
+// Upload the attestation to the repository's attestations endpoint. Returns the
+// URL of the uploaded attestation.
 const writeAttestation = async (attestation, token) => {
     const octokit = github.getOctokit(token, { request: { fetch: make_fetch_happen_1.default } });
     try {
-        await octokit.request(CREATE_ATTESTATION_REQUEST, {
+        const response = await octokit.request(CREATE_ATTESTATION_REQUEST, {
             owner: github.context.repo.owner,
             repo: github.context.repo.repo,
             data: { bundle: attestation }
         });
+        const attestationID = response.data?.attestation_id || '';
+        return `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${attestationID}`;
     }
     catch (err) {
         /* istanbul ignore next */
