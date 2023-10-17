@@ -22,7 +22,7 @@ export const generateProvenance = (
 
   return {
     _type: INTOTO_STATEMENT_V1_TYPE,
-    subject,
+    subject: [subject],
     predicateType: SLSA_PREDICATE_V1_TYPE,
     predicate: {
       buildDefinition: {
