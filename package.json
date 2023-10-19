@@ -84,7 +84,7 @@
     "make-fetch-happen": "^13.0.0"
   },
   "devDependencies": {
-    "@sigstore/mock": "^0.6.0",
+    "@sigstore/mock": "^0.6.1",
     "@types/jest": "^29.5.5",
     "@types/make-fetch-happen": "^10.0.3",
     "@types/node": "^20.8.7",
