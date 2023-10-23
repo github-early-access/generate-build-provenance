@@ -14,12 +14,14 @@ import {
   FULCIO_INTERNAL_URL,
   FULCIO_PUBLIC_GOOD_URL,
   REKOR_PUBLIC_GOOD_URL,
+  SEARCH_PUBLIC_GOOD_URL,
   TSA_INTERNAL_URL
 } from '../src/endpoints'
 import * as main from '../src/main'
 
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug')
+const infoMock = jest.spyOn(core, 'info')
 const getInputMock = jest.spyOn(core, 'getInput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
 
@@ -39,6 +41,8 @@ describe('action', () => {
     'base64'
   )}.}`
 
+  const attestationID = '1234567890'
+
   beforeEach(() => {
     jest.clearAllMocks()
 
@@ -52,7 +56,7 @@ describe('action', () => {
 
     nock('https://api.github.com')
       .post(/^\/repos\/.*\/.*\/attestations$/)
-      .reply(201)
+      .reply(201, { attestation_id: attestationID })
 
     process.env = {
       ...originalEnv,
@@ -98,9 +102,21 @@ describe('action', () => {
         1,
         expect.stringMatching('private')
       )
-      expect(debugMock).toHaveBeenNthCalledWith(
-        2,
+      expect(infoMock).toHaveBeenNthCalledWith(
+        1,
         expect.stringMatching('https://in-toto.io/Statement/v1')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching('-----BEGIN CERTIFICATE-----')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        3,
+        expect.stringMatching(/attestation uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        4,
+        expect.stringMatching(attestationID)
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
@@ -136,9 +152,29 @@ describe('action', () => {
         1,
         expect.stringMatching('public')
       )
-      expect(debugMock).toHaveBeenNthCalledWith(
-        2,
+      expect(infoMock).toHaveBeenNthCalledWith(
+        1,
         expect.stringMatching('https://in-toto.io/Statement/v1')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching('-----BEGIN CERTIFICATE-----')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        3,
+        expect.stringMatching(/signature uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        4,
+        expect.stringMatching(SEARCH_PUBLIC_GOOD_URL)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        5,
+        expect.stringMatching(/attestation uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        6,
+        expect.stringMatching(attestationID)
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })

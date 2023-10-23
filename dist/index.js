@@ -58149,6 +58149,8 @@ const provenance_1 = __nccwpck_require__(38);
 const sign_1 = __nccwpck_require__(6110);
 const store_1 = __nccwpck_require__(9425);
 const subject_1 = __nccwpck_require__(5206);
+const COLOR_CYAN = '\x1B[36m';
+const COLOR_DEFAULT = '\x1B[39m';
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -58159,16 +58161,26 @@ async function run() {
     const visibility = github.context.payload.repository?.visibility === 'public'
         ? 'public'
         : 'private';
-    core.debug(`Provenance visibility: ${visibility}`);
+    core.debug(`Provenance attestation visibility: ${visibility}`);
     try {
         // Calculate subject from inputs and generate provenance
         const subject = await (0, subject_1.subjectFromInputs)();
         const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
-        core.debug(JSON.stringify(provenance));
+        core.startGroup(highlight(`Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`));
+        core.info(JSON.stringify(provenance, null, 2));
+        core.endGroup();
+        // Sign provenance w/ Sigstore
         const attestation = await (0, sign_1.signStatement)(provenance, visibility);
-        // TODO: Replace w/ artifact upload
-        core.debug(JSON.stringify(attestation));
-        await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
+        core.startGroup(highlight('Attestation signed using ephemeral certificate'));
+        core.info(attestation.certificate);
+        core.endGroup();
+        if (attestation.tlogURL) {
+            core.info(highlight('Attestation signature uploaded to Rekor transparency log'));
+            core.info(attestation.tlogURL);
+        }
+        const attestationURL = await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
+        core.info(highlight('Attestation uploaded to repository'));
+        core.info(attestationURL);
     }
     catch (err) {
         // Fail the workflow run if an error occurs
@@ -58176,6 +58188,7 @@ async function run() {
     }
 }
 exports.run = run;
+const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
 
 
 /***/ }),
@@ -58246,14 +58259,19 @@ exports.generateProvenance = generateProvenance;
 /***/ }),
 
 /***/ 6110:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.signStatement = void 0;
 const bundle_1 = __nccwpck_require__(9715);
 const sign_1 = __nccwpck_require__(2071);
+const assert_1 = __importDefault(__nccwpck_require__(9491));
+const node_crypto_1 = __nccwpck_require__(6005);
 const endpoints_1 = __nccwpck_require__(9112);
 const INTOTO_PAYLOAD_TYPE = 'application/vnd.in-toto+json';
 const OIDC_AUDIENCE = 'sigstore';
@@ -58283,8 +58301,12 @@ const signStatement = async (statement, visibility) => {
     if (visibility === 'public' && tlogEntries.length > 0) {
         tlogURL = `${endpoints_1.SEARCH_PUBLIC_GOOD_URL}?logIndex=${tlogEntries[0].logIndex}`;
     }
+    // Extract the signing certificate from the bundle
+    (0, assert_1.default)(bundle.verificationMaterial.content.$case === 'x509CertificateChain', 'Bundle must contain an x509 certificate chain');
+    const signingCert = new node_crypto_1.X509Certificate(bundle.verificationMaterial.content.x509CertificateChain.certificates[0].rawBytes);
     return {
         bundle: (0, bundle_1.bundleToJSON)(bundle),
+        certificate: signingCert.toString(),
         tlogURL
     };
 };
@@ -58364,7 +58386,7 @@ const writeAttestation = async (attestation, token) => {
             repo: github.context.repo.repo,
             data: { bundle: attestation }
         });
-        const attestationID = response.data?.attestation_id || '';
+        const attestationID = response.data?.attestation_id;
         return `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${attestationID}`;
     }
     catch (err) {
@@ -58591,6 +58613,14 @@ module.exports = require("https");
 
 "use strict";
 module.exports = require("net");
+
+/***/ }),
+
+/***/ 6005:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:crypto");
 
 /***/ }),
 

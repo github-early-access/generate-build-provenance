@@ -63,6 +63,7 @@ describe('signProvenance', () => {
       expect(att).toBeDefined()
       expect(att.bundle).toBeDefined()
       expect(att.tlogURL).toBeDefined()
+      expect(att.certificate).toMatch(/^-----BEGIN CERTIFICATE-----/)
     })
   })
 
@@ -79,6 +80,7 @@ describe('signProvenance', () => {
       expect(att).toBeDefined()
       expect(att.bundle).toBeDefined()
       expect(att.tlogURL).toBeUndefined()
+      expect(att.certificate).toMatch(/^-----BEGIN CERTIFICATE-----/)
     })
   })
 })

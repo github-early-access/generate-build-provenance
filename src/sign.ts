@@ -8,6 +8,8 @@ import {
   TSAWitness,
   Witness
 } from '@sigstore/sign'
+import assert from 'assert'
+import { X509Certificate } from 'node:crypto'
 import {
   FULCIO_INTERNAL_URL,
   FULCIO_PUBLIC_GOOD_URL,
@@ -32,6 +34,7 @@ type Visibility = 'public' | 'private'
 
 type Attestation = {
   bundle: unknown
+  certificate: string
   tlogURL?: string
 }
 
@@ -69,8 +72,18 @@ export const signStatement = async (
     tlogURL = `${SEARCH_PUBLIC_GOOD_URL}?logIndex=${tlogEntries[0].logIndex}`
   }
 
+  // Extract the signing certificate from the bundle
+  assert(
+    bundle.verificationMaterial.content.$case === 'x509CertificateChain',
+    'Bundle must contain an x509 certificate chain'
+  )
+  const signingCert = new X509Certificate(
+    bundle.verificationMaterial.content.x509CertificateChain.certificates[0].rawBytes
+  )
+
   return {
     bundle: bundleToJSON(bundle),
+    certificate: signingCert.toString(),
     tlogURL
   }
 }
