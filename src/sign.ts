@@ -103,6 +103,7 @@ const initBundleBuilder = (opts: SignOptions): BundleBuilder => {
     witnesses.push(
       new RekorWitness({
         rekorBaseURL: opts.rekorURL,
+        entryType: 'dsse',
         timeout: DEFAULT_TIMEOUT,
         retry: DEFAULT_RETRIES
       })

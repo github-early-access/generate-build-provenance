@@ -11745,13 +11745,14 @@ const entry_1 = __nccwpck_require__(3776);
 exports.DEFAULT_REKOR_URL = 'https://rekor.sigstore.dev';
 class RekorWitness {
     constructor(options) {
+        this.entryType = options.entryType;
         this.tlog = new client_1.TLogClient({
             ...options,
             rekorBaseURL: options.rekorBaseURL || /* istanbul ignore next */ exports.DEFAULT_REKOR_URL,
         });
     }
     async testify(content, publicKey) {
-        const proposedEntry = (0, entry_1.toProposedEntry)(content, publicKey);
+        const proposedEntry = (0, entry_1.toProposedEntry)(content, publicKey, this.entryType);
         const entry = await this.tlog.createEntry(proposedEntry);
         return toTransparencyLogEntry(entry);
     }
@@ -58323,6 +58324,7 @@ const initBundleBuilder = (opts) => {
     if (opts.rekorURL) {
         witnesses.push(new sign_1.RekorWitness({
             rekorBaseURL: opts.rekorURL,
+            entryType: 'dsse',
             timeout: DEFAULT_TIMEOUT,
             retry: DEFAULT_RETRIES
         }));
@@ -69293,7 +69295,7 @@ exports.LRUCache = LRUCache;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"2.1.0"};
+module.exports = {"i8":"2.2.0"};
 
 /***/ }),
 
