@@ -23,6 +23,7 @@ import * as main from '../src/main'
 const debugMock = jest.spyOn(core, 'debug')
 const infoMock = jest.spyOn(core, 'info')
 const getInputMock = jest.spyOn(core, 'getInput')
+const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
 
 // Mock the action's main function
@@ -118,6 +119,11 @@ describe('action', () => {
         4,
         expect.stringMatching(attestationID)
       )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        1,
+        'bundle',
+        expect.anything()
+      )
       expect(setFailedMock).not.toHaveBeenCalled()
     })
   })
@@ -175,6 +181,11 @@ describe('action', () => {
       expect(infoMock).toHaveBeenNthCalledWith(
         6,
         expect.stringMatching(attestationID)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        1,
+        'bundle',
+        expect.anything()
       )
       expect(setFailedMock).not.toHaveBeenCalled()
     })

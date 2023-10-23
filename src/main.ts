@@ -55,6 +55,9 @@ export async function run(): Promise<void> {
 
     core.info(highlight('Attestation uploaded to repository'))
     core.info(attestationURL)
+
+    core.setOutput('bundle', attestation.bundle)
+    core.debug(JSON.stringify(attestation.bundle))
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(

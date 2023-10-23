@@ -58182,6 +58182,8 @@ async function run() {
         const attestationURL = await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
         core.info(highlight('Attestation uploaded to repository'));
         core.info(attestationURL);
+        core.setOutput('bundle', attestation.bundle);
+        core.debug(JSON.stringify(attestation.bundle));
     }
     catch (err) {
         // Fail the workflow run if an error occurs
