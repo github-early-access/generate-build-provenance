@@ -56,7 +56,7 @@ describe('action', () => {
 
     nock('https://api.github.com')
       .post(/^\/repos\/.*\/.*\/attestations$/)
-      .reply(201, { attestation_id: attestationID })
+      .reply(201, { id: attestationID })
 
     process.env = {
       ...originalEnv,

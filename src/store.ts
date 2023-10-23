@@ -18,7 +18,7 @@ export const writeAttestation = async (
       data: { bundle: attestation }
     })
 
-    const attestationID = response.data?.attestation_id
+    const attestationID = response.data?.id
     return `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${attestationID}`
   } catch (err) {
     /* istanbul ignore next */
