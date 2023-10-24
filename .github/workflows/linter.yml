@@ -21,11 +21,11 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
         with:
           node-version: 18
           cache: npm
@@ -36,7 +36,7 @@ jobs:
 
       - name: Lint Code Base
         id: super-linter
-        uses: super-linter/super-linter/slim@v5
+        uses: super-linter/super-linter/slim@b0d1acee1f8050d1684a28ddbf8315f81d084fe9 # v5.4.3
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
