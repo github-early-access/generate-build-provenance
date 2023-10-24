@@ -58109,7 +58109,7 @@ exports.FULCIO_PUBLIC_GOOD_URL = 'https://fulcio.sigstore.dev';
 exports.REKOR_PUBLIC_GOOD_URL = 'https://rekor.sigstore.dev';
 exports.SEARCH_PUBLIC_GOOD_URL = 'https://search.sigstore.dev';
 exports.FULCIO_INTERNAL_URL = 'https://fulcio.githubapp.com';
-exports.TSA_INTERNAL_URL = 'https://timestamp-authority.githubapp.com';
+exports.TSA_INTERNAL_URL = 'https://timestamp.githubapp.com';
 
 
 /***/ }),
