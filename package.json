@@ -86,7 +86,7 @@
   "devDependencies": {
     "@sigstore/mock": "^0.6.1",
     "@types/jest": "^29.5.8",
-    "@types/make-fetch-happen": "^10.0.3",
+    "@types/make-fetch-happen": "^10.0.4",
     "@types/node": "^20.8.10",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
