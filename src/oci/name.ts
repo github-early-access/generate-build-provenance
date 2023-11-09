@@ -27,7 +27,7 @@ const NAME_COMPONENT_RE = expression(
 
 const NAME_RE = expression(
   NAME_COMPONENT_RE,
-  optional('\\/', NAME_COMPONENT_RE)
+  repeated(optional('\\/', NAME_COMPONENT_RE))
 )
 
 // Component of the registry domain must be at least one letter or number, with

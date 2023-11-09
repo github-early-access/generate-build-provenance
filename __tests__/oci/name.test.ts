@@ -13,11 +13,14 @@ describe('parseImageName', () => {
     name = parseImageName('localhost:8080/repo')
     expect(name.registry).toEqual('localhost:8080')
     expect(name.path).toEqual('repo')
+
+    name = parseImageName('a/b/c/d')
+    expect(name.registry).toEqual('a')
+    expect(name.path).toEqual('b/c/d')
   })
 
   it('raises an error when the image name is invalid', () => {
     expect(() => parseImageName('repo')).toThrow()
     expect(() => parseImageName('')).toThrow()
-    expect(() => parseImageName('a/b/c/d')).toThrow()
   })
 })
