@@ -11,7 +11,7 @@ inputs:
   subject-path:
     description: >
       Path to the artifact for which provenance will be generated. Must specify
-      exactly one of "subject-path" or "subect-digest".
+      exactly one of "subject-path" or "subject-digest".
     required: false
   subject-digest:
     description: >
