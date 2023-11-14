@@ -1,3 +1,4 @@
+// https://github.com/opencontainers/image-spec/blob/main/descriptor.md#properties
 export type Descriptor = {
   mediaType: string
   digest: string
@@ -8,15 +9,7 @@ export type Descriptor = {
   data?: string
 }
 
-export type Platform = {
-  architecture: string
-  os: string
-  'os.version'?: string
-  'os.features'?: string[]
-  variant?: string
-  features?: string[]
-}
-
+// https://github.com/opencontainers/image-spec/blob/main/manifest.md#image-manifest-property-descriptions
 export type ImageManifest = {
   schemaVersion: number
   mediaType: string
@@ -25,6 +18,16 @@ export type ImageManifest = {
   layers: Descriptor[]
   subject?: Descriptor
   annotations?: Record<string, string>
+}
+
+// https://github.com/opencontainers/image-spec/blob/main/image-index.md#image-index-property-descriptions
+export type Platform = {
+  architecture: string
+  os: string
+  'os.version'?: string
+  'os.features'?: string[]
+  variant?: string
+  features?: string[]
 }
 
 export type ImageIndex = {

@@ -24,6 +24,13 @@ inputs:
       Subject name as it should appear in the provenance statement. Required
       unless "subject-path" is specified, in which case it will be inferred from
       the path.
+  push-to-registry:
+    description: >
+      Whether to push the provenance statement to the image registry. Requires
+      that the "subject-name" parameter specify the fully-qualified image name
+      and that the "subject-digest" parameter be specified. Defaults to false.
+    default: false
+    required: false
 
 runs:
   using: node20

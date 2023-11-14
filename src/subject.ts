@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 
-const DIGEST_ALGORITHM = 'sha256'
+export const DIGEST_ALGORITHM = 'sha256'
 
 export type Subject = {
   name: string

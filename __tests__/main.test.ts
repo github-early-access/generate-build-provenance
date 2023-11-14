@@ -18,13 +18,19 @@ import {
   TSA_INTERNAL_URL
 } from '../src/endpoints'
 import * as main from '../src/main'
+import * as oci from '../src/oci'
+import { CONTENT_TYPE_OCI_MANIFEST } from '../src/oci/constants'
 
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug')
 const infoMock = jest.spyOn(core, 'info')
 const getInputMock = jest.spyOn(core, 'getInput')
+const getBooleanInputMock = jest.spyOn(core, 'getBooleanInput')
 const setOutputMock = jest.spyOn(core, 'setOutput')
 const setFailedMock = jest.spyOn(core, 'setFailed')
+
+const summaryWriteMock = jest.spyOn(core.summary, 'write')
+summaryWriteMock.mockImplementation(async () => Promise.resolve(core.summary))
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
@@ -90,6 +96,7 @@ describe('action', () => {
       })
 
       getInputMock.mockImplementation(mockInput(inputs))
+      getBooleanInputMock.mockImplementation(() => false)
 
       await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
       await mockTSA({ baseURL: TSA_INTERNAL_URL })
@@ -145,6 +152,7 @@ describe('action', () => {
 
       // Mock the action's inputs
       getInputMock.mockImplementation(mockInput(inputs))
+      getBooleanInputMock.mockImplementation(() => false)
 
       await mockFulcio({ baseURL: FULCIO_PUBLIC_GOOD_URL, strict: false })
       await mockRekor({ baseURL: REKOR_PUBLIC_GOOD_URL })
@@ -188,6 +196,85 @@ describe('action', () => {
         expect.anything()
       )
       expect(setFailedMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when push-to-registry is true', () => {
+    const ociSpy = jest.spyOn(oci, 'attachArtifactToImage')
+
+    const artifactDigest = 'sha256:1234567890'
+    const artifactSize = 123
+
+    const inputs = {
+      'subject-digest':
+        'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+      'subject-name': 'registry/foo/bar',
+      'github-token': 'gh-token'
+    }
+
+    beforeEach(async () => {
+      // Set the GH context with private repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'private' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      getInputMock.mockImplementation(mockInput(inputs))
+
+      // This is the where we mock the push-to-registry input
+      getBooleanInputMock.mockImplementation(() => true)
+
+      await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
+      await mockTSA({ baseURL: TSA_INTERNAL_URL })
+
+      ociSpy.mockImplementation(async () =>
+        Promise.resolve({
+          digest: artifactDigest,
+          mediaType: CONTENT_TYPE_OCI_MANIFEST,
+          size: artifactSize
+        })
+      )
+    })
+
+    it('invokes the action w/o error', async () => {
+      await main.run()
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).not.toHaveBeenCalled()
+
+      expect(debugMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('private')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching('https://in-toto.io/Statement/v1')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching('-----BEGIN CERTIFICATE-----')
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        3,
+        expect.stringMatching(/attestation uploaded/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        4,
+        expect.stringMatching(attestationID)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        5,
+        expect.stringMatching(/attestation uploaded to registry/i)
+      )
+      expect(infoMock).toHaveBeenNthCalledWith(
+        6,
+        expect.stringMatching(artifactDigest)
+      )
+      expect(setOutputMock).toHaveBeenNthCalledWith(
+        1,
+        'bundle',
+        expect.anything()
+      )
     })
   })
 

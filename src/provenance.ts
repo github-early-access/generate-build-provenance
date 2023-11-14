@@ -1,7 +1,7 @@
 import type { Subject } from './subject'
 
 const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1'
-const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1'
+export const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1'
 
 const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner'
 const GITHUB_BUILD_TYPE =

@@ -1,9 +1,11 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { generateProvenance } from './provenance'
+import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
+import { attachArtifactToImage } from './oci'
+import { generateProvenance, SLSA_PREDICATE_V1_TYPE } from './provenance'
 import { signStatement } from './sign'
 import { writeAttestation } from './store'
-import { subjectFromInputs } from './subject'
+import { DIGEST_ALGORITHM, subjectFromInputs } from './subject'
 
 const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
@@ -55,9 +57,28 @@ export async function run(): Promise<void> {
 
     core.info(highlight('Attestation uploaded to repository'))
     core.info(attestationURL)
+    core.summary.addHeading('Attestation Created', 3)
+    core.summary.addLink(
+      `${subject.name}@${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
+      attestationURL
+    )
+    core.summary.write()
+
+    if (core.getBooleanInput('push-to-registry', { required: false })) {
+      const artifact = await attachArtifactToImage({
+        imageName: subject.name,
+        imageDigest: `${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
+        artifact: JSON.stringify(attestation.bundle),
+        mediaType: BUNDLE_V02_MEDIA_TYPE,
+        annotations: {
+          'dev.sigstore.bundle/predicateType': SLSA_PREDICATE_V1_TYPE
+        }
+      })
+      core.info(highlight('Attestation uploaded to registry'))
+      core.info(`${subject.name}@${artifact.digest}`)
+    }
 
     core.setOutput('bundle', attestation.bundle)
-    core.debug(JSON.stringify(attestation.bundle))
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(

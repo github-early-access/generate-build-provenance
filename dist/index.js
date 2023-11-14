@@ -10353,13 +10353,13 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.MessageSignatureBundleBuilder = exports.DSSEBundleBuilder = void 0;
 var dsse_1 = __nccwpck_require__(8791);
 Object.defineProperty(exports, "DSSEBundleBuilder", ({ enumerable: true, get: function () { return dsse_1.DSSEBundleBuilder; } }));
-var message_1 = __nccwpck_require__(6258);
+var message_1 = __nccwpck_require__(5243);
 Object.defineProperty(exports, "MessageSignatureBundleBuilder", ({ enumerable: true, get: function () { return message_1.MessageSignatureBundleBuilder; } }));
 
 
 /***/ }),
 
-/***/ 6258:
+/***/ 5243:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -17542,7 +17542,7 @@ module.exports = {
     'gb18030': {
         type: '_dbcs',
         table: function() { return (__nccwpck_require__(3336).concat)(__nccwpck_require__(4346)) },
-        gb18030: function() { return __nccwpck_require__(6290) },
+        gb18030: function() { return __nccwpck_require__(6258) },
         encodeSkipVals: [0x80],
         encodeAdd: {'€': 0xA2E3},
     },
@@ -58146,6 +58146,8 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
+const bundle_1 = __nccwpck_require__(9715);
+const oci_1 = __nccwpck_require__(1871);
 const provenance_1 = __nccwpck_require__(38);
 const sign_1 = __nccwpck_require__(6110);
 const store_1 = __nccwpck_require__(9425);
@@ -58182,8 +58184,23 @@ async function run() {
         const attestationURL = await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
         core.info(highlight('Attestation uploaded to repository'));
         core.info(attestationURL);
+        core.summary.addHeading('Attestation Created', 3);
+        core.summary.addLink(`${subject.name}@${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`, attestationURL);
+        core.summary.write();
+        if (core.getBooleanInput('push-to-registry', { required: false })) {
+            const artifact = await (0, oci_1.attachArtifactToImage)({
+                imageName: subject.name,
+                imageDigest: `${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`,
+                artifact: JSON.stringify(attestation.bundle),
+                mediaType: bundle_1.BUNDLE_V02_MEDIA_TYPE,
+                annotations: {
+                    'dev.sigstore.bundle/predicateType': provenance_1.SLSA_PREDICATE_V1_TYPE
+                }
+            });
+            core.info(highlight('Attestation uploaded to registry'));
+            core.info(`${subject.name}@${artifact.digest}`);
+        }
         core.setOutput('bundle', attestation.bundle);
-        core.debug(JSON.stringify(attestation.bundle));
     }
     catch (err) {
         // Fail the workflow run if an error occurs
@@ -58196,15 +58213,543 @@ const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
 
 /***/ }),
 
+/***/ 1202:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.HEADER_OCI_SUBJECT = exports.HEADER_LOCATION = exports.HEADER_IF_MATCH = exports.HEADER_ETAG = exports.HEADER_DIGEST = exports.HEADER_CONTENT_TYPE = exports.HEADER_CONTENT_LENGTH = exports.HEADER_AUTHORIZATION = exports.HEADER_AUTHENTICATE = exports.HEADER_API_VERSION = exports.HEADER_ACCEPT = exports.CONTENT_TYPE_EMPTY_DESCRIPTOR = exports.CONTENT_TYPE_OCTET_STREAM = exports.CONTENT_TYPE_OCI_MANIFEST = exports.CONTENT_TYPE_OCI_INDEX = void 0;
+exports.CONTENT_TYPE_OCI_INDEX = 'application/vnd.oci.image.index.v1+json';
+exports.CONTENT_TYPE_OCI_MANIFEST = 'application/vnd.oci.image.manifest.v1+json';
+exports.CONTENT_TYPE_OCTET_STREAM = 'application/octet-stream';
+exports.CONTENT_TYPE_EMPTY_DESCRIPTOR = 'application/vnd.oci.empty.v1+json';
+exports.HEADER_ACCEPT = 'Accept';
+exports.HEADER_API_VERSION = 'Docker-Distribution-API-Version';
+exports.HEADER_AUTHENTICATE = 'WWW-Authenticate';
+exports.HEADER_AUTHORIZATION = 'Authorization';
+exports.HEADER_CONTENT_LENGTH = 'Content-Length';
+exports.HEADER_CONTENT_TYPE = 'Content-Type';
+exports.HEADER_DIGEST = 'Docker-Content-Digest';
+exports.HEADER_ETAG = 'Etag';
+exports.HEADER_IF_MATCH = 'If-Match';
+exports.HEADER_LOCATION = 'Location';
+exports.HEADER_OCI_SUBJECT = 'OCI-Subject';
+
+
+/***/ }),
+
+/***/ 4253:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fromBasicAuth = exports.toBasicAuth = exports.getRegistryCredentials = void 0;
+const node_fs_1 = __importDefault(__nccwpck_require__(7561));
+const node_os_1 = __importDefault(__nccwpck_require__(612));
+const node_path_1 = __importDefault(__nccwpck_require__(9411));
+// Returns the credentials for a given registry by reading the Docker config
+// file.
+const getRegistryCredentials = (registry) => {
+    const dockerConfigFile = node_path_1.default.join(node_os_1.default.homedir(), '.docker', 'config.json');
+    let content;
+    try {
+        content = node_fs_1.default.readFileSync(dockerConfigFile, 'utf8');
+    }
+    catch (err) {
+        throw new Error(`No credential file found at ${dockerConfigFile}`);
+    }
+    const dockerConfig = JSON.parse(content);
+    const credKey = Object.keys(dockerConfig?.auths || {}).find(key => key.includes(registry)) || registry;
+    const creds = dockerConfig?.auths?.[credKey];
+    if (!creds) {
+        throw new Error(`No credentials found for registry ${registry}`);
+    }
+    return (0, exports.fromBasicAuth)(creds.auth);
+};
+exports.getRegistryCredentials = getRegistryCredentials;
+// Encode the username and password as base64-encoded basicauth value
+const toBasicAuth = (creds) => Buffer.from(`${creds.username}:${creds.password}`).toString('base64');
+exports.toBasicAuth = toBasicAuth;
+// Decode the base64-encoded basicauth value
+const fromBasicAuth = (auth) => {
+    // Need to account for the possibility of ':' in the password
+    const [username, ...rest] = Buffer.from(auth, 'base64').toString().split(':');
+    const password = rest.join(':');
+    return { username, password };
+};
+exports.fromBasicAuth = fromBasicAuth;
+
+
+/***/ }),
+
+/***/ 6577:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.checkStatus = exports.HTTPError = void 0;
+class HTTPError extends Error {
+    statusCode;
+    constructor({ status, message }) {
+        super(`(${status}) ${message}`);
+        this.statusCode = status;
+    }
+}
+exports.HTTPError = HTTPError;
+// Inspects the response status and throws an HTTPError if it is not 2xx
+const checkStatus = (response) => {
+    if (response.ok) {
+        return;
+    }
+    throw new HTTPError({
+        message: `OCI API: ${response.statusText}`,
+        status: response.status
+    });
+};
+exports.checkStatus = checkStatus;
+
+
+/***/ }),
+
+/***/ 7135:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OCIImage = void 0;
+const constants_1 = __nccwpck_require__(1202);
+const error_1 = __nccwpck_require__(6577);
+const registry_1 = __nccwpck_require__(7264);
+const EMPTY_BLOB = Buffer.from('{}');
+class OCIImage {
+    #client;
+    #credentials;
+    #downgrade = false;
+    constructor(image, creds, opts) {
+        this.#client = new registry_1.RegistryClient(image.registry, image.path, opts);
+        this.#credentials = creds;
+        // If the registry is not OCI-compliant, downgrade to Docker V2 API
+        this.#downgrade =
+            image.registry.includes('docker.io') ||
+                image.registry.includes('amazonaws.com');
+    }
+    async addArtifact(opts) {
+        if (this.#credentials) {
+            await this.#client.signIn(this.#credentials);
+        }
+        // Check that the image exists
+        const imageDescriptor = await this.#client.checkManifest(opts.imageDigest);
+        // Upload the artifact blob
+        const artifactBlob = await this.#client.uploadBlob(Buffer.from(opts.artifact));
+        // Upload the empty blob (needed for the manifest config)
+        const emptyBlob = await this.#client.uploadBlob(EMPTY_BLOB);
+        // Construct artifact manifest
+        const manifest = buildManifest({
+            artifactDescriptor: { ...artifactBlob, mediaType: opts.mediaType },
+            subjectDescriptor: imageDescriptor,
+            configDescriptor: {
+                ...emptyBlob,
+                mediaType: constants_1.CONTENT_TYPE_EMPTY_DESCRIPTOR
+            },
+            annotations: opts.annotations
+        });
+        /* istanbul ignore if */
+        if (this.#downgrade) {
+            delete manifest.subject;
+            delete manifest.artifactType;
+        }
+        // Upload artifact manifest
+        const artifactDescriptor = await this.#client.uploadManifest(JSON.stringify(manifest));
+        // Manually update the referrers list if the referrers API is not supported.
+        // The lack of a subjectDigest indicates that the referrers API is not
+        // supported.
+        if (artifactDescriptor.subjectDigest === undefined) {
+            await this.#createReferrersIndexByTag({
+                artifact: {
+                    ...artifactDescriptor,
+                    artifactType: opts.mediaType,
+                    annotations: opts.annotations
+                },
+                imageDigest: opts.imageDigest
+            });
+        }
+        return artifactDescriptor;
+    }
+    // Create a referrers index by tag. This is a fallback for registries that do
+    // not support the referrers API.
+    // https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests-with-subject
+    async #createReferrersIndexByTag(opts) {
+        const referrerTag = digestToTag(opts.imageDigest);
+        let referrerManifest;
+        let etag;
+        try {
+            // Retrieve any existing referrer index
+            const referrerIndex = await this.#client.getManifest(referrerTag);
+            if (referrerIndex.mediaType !== constants_1.CONTENT_TYPE_OCI_INDEX) {
+                throw new Error(`Expected referrer manifest type ${constants_1.CONTENT_TYPE_OCI_INDEX}, got ${referrerIndex.mediaType}`);
+            }
+            referrerManifest = referrerIndex.body;
+            etag = referrerIndex.etag;
+        }
+        catch (err) {
+            // If the referrer index does not exist, create a new one
+            if (err instanceof error_1.HTTPError && err.statusCode === 404) {
+                referrerManifest = newIndex();
+            }
+            else {
+                throw err;
+            }
+        }
+        // If the artifact is not already in the index, add it to the list and
+        // re-upload the index
+        if (!referrerManifest.manifests.some(manifest => manifest.digest === opts.artifact.digest)) {
+            // Add the artifact to the index
+            referrerManifest.manifests.push(opts.artifact);
+            this.#client.uploadManifest(JSON.stringify(referrerManifest), {
+                mediaType: constants_1.CONTENT_TYPE_OCI_INDEX,
+                reference: referrerTag,
+                etag
+            });
+        }
+    }
+}
+exports.OCIImage = OCIImage;
+// Build an OCI manifest document with references to the given artifact,
+// subject, and config
+const buildManifest = (opts) => ({
+    schemaVersion: 2,
+    mediaType: constants_1.CONTENT_TYPE_OCI_MANIFEST,
+    artifactType: opts.artifactDescriptor.mediaType,
+    config: opts.configDescriptor,
+    layers: [opts.artifactDescriptor],
+    subject: opts.subjectDescriptor,
+    annotations: opts.annotations
+});
+// Return an empty OCI index document
+const newIndex = () => ({
+    mediaType: constants_1.CONTENT_TYPE_OCI_INDEX,
+    schemaVersion: 2,
+    manifests: []
+});
+// Convert an image digest to a tag per the Referrers Tag Schema
+// https://github.com/opencontainers/distribution-spec/blob/main/spec.md#referrers-tag-schema
+const digestToTag = (digest) => {
+    return digest.replace(':', '-');
+};
+
+
+/***/ }),
+
+/***/ 1871:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.attachArtifactToImage = void 0;
+const credentials_1 = __nccwpck_require__(4253);
+const image_1 = __nccwpck_require__(7135);
+const name_1 = __nccwpck_require__(7803);
+const attachArtifactToImage = async (opts) => {
+    const image = (0, name_1.parseImageName)(opts.imageName);
+    const creds = (0, credentials_1.getRegistryCredentials)(image.registry);
+    return new image_1.OCIImage(image, creds, opts.fetchOpts).addArtifact(opts);
+};
+exports.attachArtifactToImage = attachArtifactToImage;
+
+
+/***/ }),
+
+/***/ 7803:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parseImageName = void 0;
+const expression = (...res) => res.join('');
+const group = (...res) => `(?:${expression(...res)})`;
+const repeated = (...res) => `${group(expression(...res))}+`;
+const optional = (...res) => `${group(expression(...res))}?`;
+const capture = (...res) => `(${expression(...res)})`;
+const anchored = (...res) => `^${expression(...res)}$`;
+// Lower case letters, numbers
+const ALPHA_NUMERIC_RE = '[a-z0-9]+';
+// Separators allowed to be embedded in name components. This allows one period,
+// one or two underscore or multiple dashes.
+const SEPARATOR_RE = group('\\.|_|__|-+');
+// Registry path component names to start with at least one letter or number,
+// with following parts able to be separated by one period, one or two
+// underscores or multiple dashes.
+const NAME_COMPONENT_RE = expression(ALPHA_NUMERIC_RE, optional(repeated(SEPARATOR_RE, ALPHA_NUMERIC_RE)));
+const NAME_RE = expression(NAME_COMPONENT_RE, repeated(optional('\\/', NAME_COMPONENT_RE)));
+// Component of the registry domain must be at least one letter or number, with
+// following parts able to be separated by a dash.
+const DOMAIN_COMPONENT_RE = group('[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]');
+// Restricts the registry domain to be one or more period separated components
+// followed by an optional port.
+const DOMAIN_RE = expression(DOMAIN_COMPONENT_RE, optional(repeated('\\.', DOMAIN_COMPONENT_RE)), optional(':[0-9]+'));
+// Capture the registry domain and path components of a repository name.
+const ANCHORED_NAME_RE = anchored(capture(DOMAIN_RE), '\\/', capture(NAME_RE));
+// Parses a fully qualified image name into its registry and path components.
+const parseImageName = (image) => {
+    const matches = image.match(ANCHORED_NAME_RE);
+    if (!matches) {
+        throw new Error(`Invalid image name: ${image}`);
+    }
+    return {
+        registry: matches[1],
+        path: matches[2]
+    };
+};
+exports.parseImageName = parseImageName;
+
+
+/***/ }),
+
+/***/ 7264:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RegistryClient = void 0;
+const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
+const node_crypto_1 = __importDefault(__nccwpck_require__(6005));
+const constants_1 = __nccwpck_require__(1202);
+const credentials_1 = __nccwpck_require__(4253);
+const error_1 = __nccwpck_require__(6577);
+class RegistryClient {
+    #baseURL;
+    #repository;
+    #fetch;
+    constructor(registry, repository, opts) {
+        this.#repository = repository;
+        this.#fetch = make_fetch_happen_1.default.defaults(opts);
+        // Use http for localhost registries, https otherwise
+        const hostname = new URL(`http://${registry}`).hostname;
+        /* istanbul ignore next */
+        const protocol = hostname === 'localhost' || hostname === '127.0.0.1' ? 'http' : 'https';
+        this.#baseURL = `${protocol}://${registry}`;
+    }
+    // Authenticate with the registry. Sends an unauthenticated request to the
+    // registry in order to get an auth challenge. If the challenge scheme is
+    // "basic" we don't need a token and can authenticate requests using basic
+    // auth. Otherwise, we fetch a token from the auth server and use that to
+    // authenticate requests.
+    // https://github.com/google/go-containerregistry/blob/main/pkg/authn/README.md#the-registry
+    async signIn(creds) {
+        // Initiate a blob upload to get the auth challenge
+        const probeResponse = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/blobs/uploads/`, { method: 'POST' });
+        // If we get a 200 response, we're already authenticated
+        if (probeResponse.status === 200) {
+            return;
+        }
+        const authHeader = probeResponse.headers.get(constants_1.HEADER_AUTHENTICATE) ||
+            /* istanbul ignore next */ '';
+        const challenge = parseChallenge(authHeader);
+        // If the challenge scheme is "basic" we don't need a token and can
+        // authenticate requests using basic auth
+        if (challenge.scheme === 'basic') {
+            const basicAuth = (0, credentials_1.toBasicAuth)(creds);
+            this.#fetch = this.#fetch.defaults({
+                headers: { [constants_1.HEADER_AUTHORIZATION]: `Basic ${basicAuth}` }
+            });
+            return;
+        }
+        let token;
+        if (creds.username === '<token>') {
+            try {
+                token = await this.#fetchOAuth2Token(creds, challenge);
+            }
+            catch (_) {
+                // If the OAUth2 token request fails, try to fetch a distribution token
+            }
+        }
+        if (!token) {
+            token = await this.#fetchDistributionToken(creds, challenge);
+        }
+        // Ensure the token is sent with all future requests
+        this.#fetch = this.#fetch.defaults({
+            headers: { [constants_1.HEADER_AUTHORIZATION]: `Bearer ${token}` }
+        });
+    }
+    // Check the registry API version
+    async checkVersion() {
+        const response = await this.#fetch(`${this.#baseURL}/v2/`);
+        (0, error_1.checkStatus)(response);
+        return response.headers.get(constants_1.HEADER_API_VERSION) || '';
+    }
+    // Upload a blob to the registry using the post/put method. Calculates the
+    // digest of the blob and checks to make sure the blob doesn't already exist
+    // in the registry before uploading.
+    async uploadBlob(blob) {
+        const digest = RegistryClient.digest(blob);
+        const size = blob.length;
+        // Check if blob already exists
+        const headResponse = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/blobs/${digest}`, { method: 'HEAD', redirect: 'follow' });
+        if (headResponse.status === 200) {
+            return {
+                mediaType: constants_1.CONTENT_TYPE_OCTET_STREAM,
+                digest,
+                size
+            };
+        }
+        // Retrieve upload location (session ID)
+        const postResponse = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/blobs/uploads/`, { method: 'POST' });
+        (0, error_1.checkStatus)(postResponse);
+        const location = postResponse.headers.get(constants_1.HEADER_LOCATION);
+        if (!location) {
+            throw new Error('OCI API: missing upload location', {});
+        }
+        // Translate location to a full URL
+        const uploadLocation = new URL(location.startsWith('/') ? `${this.#baseURL}${location}` : location);
+        // Add digest to query string
+        uploadLocation.searchParams.set('digest', digest);
+        // Upload blob
+        const putResponse = await this.#fetch(uploadLocation.href, {
+            method: 'PUT',
+            body: blob,
+            headers: { [constants_1.HEADER_CONTENT_TYPE]: constants_1.CONTENT_TYPE_OCTET_STREAM }
+        });
+        (0, error_1.checkStatus)(putResponse);
+        if (putResponse.status !== 201) {
+            throw new error_1.HTTPError({
+                message: `OCI API: unexpected status for upload`,
+                status: putResponse.status
+            });
+        }
+        return { mediaType: constants_1.CONTENT_TYPE_OCTET_STREAM, digest, size };
+    }
+    // Checks for the existence of a manifest by reference
+    async checkManifest(reference) {
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'HEAD' });
+        (0, error_1.checkStatus)(response);
+        const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) || /* istanbul ignore next */ '';
+        const digest = response.headers.get(constants_1.HEADER_DIGEST) || /* istanbul ignore next */ '';
+        const size = Number(response.headers.get(constants_1.HEADER_CONTENT_LENGTH)) ||
+            /* istanbul ignore next */ 0;
+        return { mediaType, digest, size };
+    }
+    // Retrieves a manifest by reference
+    async getManifest(reference) {
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, {
+            headers: {
+                [constants_1.HEADER_ACCEPT]: `${constants_1.CONTENT_TYPE_OCI_MANIFEST},${constants_1.CONTENT_TYPE_OCI_INDEX}`
+            }
+        });
+        (0, error_1.checkStatus)(response);
+        const body = await response.json();
+        const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) || /* istanbul ignore next */ '';
+        const digest = response.headers.get(constants_1.HEADER_DIGEST) || /* istanbul ignore next */ '';
+        const size = Number(response.headers.get(constants_1.HEADER_CONTENT_LENGTH)) || 0;
+        const etag = response.headers.get(constants_1.HEADER_ETAG) || undefined;
+        return { body, mediaType, digest, size, etag };
+    }
+    // Uploads a manifest by digest. If specified, the reference will be used as
+    // the manifest tag.
+    async uploadManifest(manifest, options = {}) {
+        const digest = RegistryClient.digest(manifest);
+        const reference = options.reference || digest;
+        const contentType = options.mediaType || constants_1.CONTENT_TYPE_OCI_MANIFEST;
+        const headers = { [constants_1.HEADER_CONTENT_TYPE]: contentType };
+        if (options.etag) {
+            headers[constants_1.HEADER_IF_MATCH] = options.etag;
+        }
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'PUT', body: manifest, headers });
+        (0, error_1.checkStatus)(response);
+        if (response.status !== 201) {
+            throw new error_1.HTTPError({
+                message: `OCI API: unexpected status for upload`,
+                status: response.status
+            });
+        }
+        const subjectDigest = response.headers.get(constants_1.HEADER_OCI_SUBJECT) || undefined;
+        return {
+            mediaType: contentType,
+            digest,
+            size: manifest.length,
+            subjectDigest
+        };
+    }
+    async #fetchDistributionToken(creds, challenge) {
+        const basicAuth = (0, credentials_1.toBasicAuth)(creds);
+        const authURL = new URL(challenge.realm);
+        authURL.searchParams.set('service', challenge.service);
+        authURL.searchParams.set('scope', challenge.scope);
+        // Make token request with basic auth
+        const tokenResponse = await this.#fetch(authURL.toString(), {
+            headers: { [constants_1.HEADER_AUTHORIZATION]: `Basic ${basicAuth}` }
+        });
+        (0, error_1.checkStatus)(tokenResponse);
+        /* eslint-disable-next-line github/no-then */
+        return tokenResponse.json().then(json => json.access_token || json.token);
+    }
+    async #fetchOAuth2Token(creds, challenge) {
+        const body = new URLSearchParams({
+            service: challenge.service,
+            scope: challenge.scope,
+            username: creds.username,
+            password: creds.password,
+            grant_type: 'password'
+        });
+        // Make OAuth token request
+        const tokenResponse = await this.#fetch(challenge.realm, {
+            method: 'POST',
+            body
+        });
+        (0, error_1.checkStatus)(tokenResponse);
+        /* eslint-disable-next-line github/no-then */
+        return tokenResponse.json().then(json => json.access_token);
+    }
+    static digest(blob) {
+        const hash = node_crypto_1.default.createHash('sha256');
+        hash.update(blob);
+        return `sha256:${hash.digest('hex')}`;
+    }
+}
+exports.RegistryClient = RegistryClient;
+// Parses an auth challenge header into its components
+// https://datatracker.ietf.org/doc/html/rfc7235#section-4.1
+function parseChallenge(challenge) {
+    // Account for the possibility of spaces in the auth params
+    const [scheme, ...rest] = challenge.split(' ');
+    const authParams = rest.join(' ');
+    if (!['Basic', 'Bearer'].includes(scheme)) {
+        throw new Error(`Invalid challenge: ${challenge}`);
+    }
+    return {
+        scheme: scheme.toLocaleLowerCase(),
+        realm: singleMatch(authParams, /realm="(.+?)"/),
+        service: singleMatch(authParams, /service="(.+?)"/),
+        scope: singleMatch(authParams, /scope="(.+?)"/)
+    };
+}
+// Returns the first capture group of a regex match, or an empty string
+const singleMatch = (str, regex) => str.match(regex)?.[1] || '';
+
+
+/***/ }),
+
 /***/ 38:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateProvenance = void 0;
+exports.generateProvenance = exports.SLSA_PREDICATE_V1_TYPE = void 0;
 const INTOTO_STATEMENT_V1_TYPE = 'https://in-toto.io/Statement/v1';
-const SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
+exports.SLSA_PREDICATE_V1_TYPE = 'https://slsa.dev/provenance/v1';
 const GITHUB_BUILDER_ID_PREFIX = 'https://github.com/actions/runner';
 const GITHUB_BUILD_TYPE = 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1';
 const generateProvenance = (subject, env) => {
@@ -58218,7 +58763,7 @@ const generateProvenance = (subject, env) => {
     return {
         _type: INTOTO_STATEMENT_V1_TYPE,
         subject: [subject],
-        predicateType: SLSA_PREDICATE_V1_TYPE,
+        predicateType: exports.SLSA_PREDICATE_V1_TYPE,
         predicate: {
             buildDefinition: {
                 buildType: GITHUB_BUILD_TYPE,
@@ -58436,12 +58981,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.subjectFromInputs = void 0;
+exports.subjectFromInputs = exports.DIGEST_ALGORITHM = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 const path_1 = __importDefault(__nccwpck_require__(1017));
-const DIGEST_ALGORITHM = 'sha256';
+exports.DIGEST_ALGORITHM = 'sha256';
 // Returns the subject specified by the action's inputs. The subject may be
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
@@ -58474,10 +59019,10 @@ const getSubjectFromPath = async (subjectPath, subjectName) => {
         throw new Error(`Could not find subject at path ${subjectPath}`);
     }
     const name = subjectName || path_1.default.parse(subjectPath).base;
-    const digest = await digestFile(DIGEST_ALGORITHM, subjectPath);
+    const digest = await digestFile(exports.DIGEST_ALGORITHM, subjectPath);
     return {
         name,
-        digest: { [DIGEST_ALGORITHM]: digest }
+        digest: { [exports.DIGEST_ALGORITHM]: digest }
     };
 };
 // Returns the subject specified by the digest of a file. The digest is returned
@@ -58633,6 +59178,30 @@ module.exports = require("node:crypto");
 
 "use strict";
 module.exports = require("node:events");
+
+/***/ }),
+
+/***/ 7561:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:fs");
+
+/***/ }),
+
+/***/ 612:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:os");
+
+/***/ }),
+
+/***/ 9411:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:path");
 
 /***/ }),
 
@@ -69349,7 +69918,7 @@ module.exports = JSON.parse('[["0","\\u0000",127],["8ea1","｡",62],["a1a1","　
 
 /***/ }),
 
-/***/ 6290:
+/***/ 6258:
 /***/ ((module) => {
 
 "use strict";
