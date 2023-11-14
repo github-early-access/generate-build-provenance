@@ -72,7 +72,7 @@ describe('RegistryClient', () => {
           })
       })
 
-      it('returns without error', async () => {
+      it('throws an error', async () => {
         await expect(subject.signIn(creds)).rejects.toThrow(
           /invalid challenge/i
         )
@@ -116,6 +116,36 @@ describe('RegistryClient', () => {
             password: creds.password
           })
           .reply(200, { access_token: accessToken })
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).resolves.toBeUndefined()
+      })
+    })
+
+    describe('when the registry uses an bearer token returns an error', () => {
+      /* eslint-disable-next-line no-shadow */
+      const creds = { username: '<token>', password: 'password' }
+      const challenge =
+        'Bearer realm="https://registry.example.com/oauth2/token";service="service";scope="scope"'
+      const accessToken = 'deadbeef'
+
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(401, undefined, {
+            'WWW-Authenticate': challenge
+          })
+          .post('/oauth2/token', {
+            service: 'service',
+            scope: 'scope',
+            grant_type: 'password',
+            username: creds.username,
+            password: creds.password
+          })
+          .reply(404, {})
+          .get(`/oauth2/token?service=service&scope=scope`)
+          .reply(200, { token: accessToken })
       })
 
       it('returns without error', async () => {
@@ -222,7 +252,7 @@ describe('RegistryClient', () => {
 
       it('throws an error', async () => {
         await expect(subject.uploadBlob(blob)).rejects.toThrow(
-          /missing upload location/
+          /missing location/i
         )
       })
     })
@@ -241,9 +271,7 @@ describe('RegistryClient', () => {
       })
 
       it('throws an error', async () => {
-        await expect(subject.uploadBlob(blob)).rejects.toThrow(
-          /unexpected status/
-        )
+        await expect(subject.uploadBlob(blob)).rejects.toThrow(/expected 201/)
       })
     })
   })
@@ -306,7 +334,7 @@ describe('RegistryClient', () => {
           /* eslint-disable-next-line jest/no-conditional-expect */
           expect(error.statusCode).toEqual(404)
           /* eslint-disable-next-line jest/no-conditional-expect */
-          expect(error.message).toMatch(/not found/i)
+          expect(error.message).toMatch(/expected 200/i)
         }
       })
     })
@@ -366,7 +394,7 @@ describe('RegistryClient', () => {
 
       it('throws an error', async () => {
         await expect(subject.uploadManifest(manifest)).rejects.toThrow(
-          /unexpected status/
+          /expected 201/
         )
       })
     })

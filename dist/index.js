@@ -58205,6 +58205,11 @@ async function run() {
     catch (err) {
         // Fail the workflow run if an error occurs
         core.setFailed(err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`);
+        /* istanbul ignore if */
+        if (err instanceof Error && err.cause) {
+            const innerErr = err.cause;
+            core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`);
+        }
     }
 }
 exports.run = run;
@@ -58293,26 +58298,29 @@ exports.fromBasicAuth = fromBasicAuth;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.checkStatus = exports.HTTPError = void 0;
+exports.ensureStatus = exports.HTTPError = void 0;
 class HTTPError extends Error {
     statusCode;
     constructor({ status, message }) {
-        super(`(${status}) ${message}`);
+        super(message);
         this.statusCode = status;
     }
 }
 exports.HTTPError = HTTPError;
-// Inspects the response status and throws an HTTPError if it is not 2xx
-const checkStatus = (response) => {
-    if (response.ok) {
-        return;
-    }
-    throw new HTTPError({
-        message: `OCI API: ${response.statusText}`,
-        status: response.status
-    });
+// Inspects the response status and throws an HTTPError if it does not match the
+// expected status code
+const ensureStatus = (expectedStatus) => {
+    return (response) => {
+        if (response.status !== expectedStatus) {
+            throw new HTTPError({
+                message: `Error fetching ${response.url} - expected ${expectedStatus}, received ${response.status}`,
+                status: response.status
+            });
+        }
+        return response;
+    };
 };
-exports.checkStatus = checkStatus;
+exports.ensureStatus = ensureStatus;
 
 
 /***/ }),
@@ -58341,43 +58349,51 @@ class OCIImage {
                 image.registry.includes('amazonaws.com');
     }
     async addArtifact(opts) {
-        if (this.#credentials) {
-            await this.#client.signIn(this.#credentials);
-        }
-        // Check that the image exists
-        const imageDescriptor = await this.#client.checkManifest(opts.imageDigest);
-        // Upload the artifact blob
-        const artifactBlob = await this.#client.uploadBlob(Buffer.from(opts.artifact));
-        // Upload the empty blob (needed for the manifest config)
-        const emptyBlob = await this.#client.uploadBlob(EMPTY_BLOB);
-        // Construct artifact manifest
-        const manifest = buildManifest({
-            artifactDescriptor: { ...artifactBlob, mediaType: opts.mediaType },
-            subjectDescriptor: imageDescriptor,
-            configDescriptor: {
-                ...emptyBlob,
-                mediaType: constants_1.CONTENT_TYPE_EMPTY_DESCRIPTOR
-            },
-            annotations: opts.annotations
-        });
-        /* istanbul ignore if */
-        if (this.#downgrade) {
-            delete manifest.subject;
-            delete manifest.artifactType;
-        }
-        // Upload artifact manifest
-        const artifactDescriptor = await this.#client.uploadManifest(JSON.stringify(manifest));
-        // Manually update the referrers list if the referrers API is not supported.
-        // The lack of a subjectDigest indicates that the referrers API is not
-        // supported.
-        if (artifactDescriptor.subjectDigest === undefined) {
-            await this.#createReferrersIndexByTag({
-                artifact: {
-                    ...artifactDescriptor,
-                    artifactType: opts.mediaType,
-                    annotations: opts.annotations
+        let artifactDescriptor;
+        try {
+            if (this.#credentials) {
+                await this.#client.signIn(this.#credentials);
+            }
+            // Check that the image exists
+            const imageDescriptor = await this.#client.checkManifest(opts.imageDigest);
+            // Upload the artifact blob
+            const artifactBlob = await this.#client.uploadBlob(Buffer.from(opts.artifact));
+            // Upload the empty blob (needed for the manifest config)
+            const emptyBlob = await this.#client.uploadBlob(EMPTY_BLOB);
+            // Construct artifact manifest
+            const manifest = buildManifest({
+                artifactDescriptor: { ...artifactBlob, mediaType: opts.mediaType },
+                subjectDescriptor: imageDescriptor,
+                configDescriptor: {
+                    ...emptyBlob,
+                    mediaType: constants_1.CONTENT_TYPE_EMPTY_DESCRIPTOR
                 },
-                imageDigest: opts.imageDigest
+                annotations: opts.annotations
+            });
+            /* istanbul ignore if */
+            if (this.#downgrade) {
+                delete manifest.subject;
+                delete manifest.artifactType;
+            }
+            // Upload artifact manifest
+            artifactDescriptor = await this.#client.uploadManifest(JSON.stringify(manifest));
+            // Manually update the referrers list if the referrers API is not supported.
+            // The lack of a subjectDigest indicates that the referrers API is not
+            // supported.
+            if (artifactDescriptor.subjectDigest === undefined) {
+                await this.#createReferrersIndexByTag({
+                    artifact: {
+                        ...artifactDescriptor,
+                        artifactType: opts.mediaType,
+                        annotations: opts.annotations
+                    },
+                    imageDigest: opts.imageDigest
+                });
+            }
+        }
+        catch (err) {
+            throw new Error(`Error uploading artifact to container registry`, {
+                cause: err
             });
         }
         return artifactDescriptor;
@@ -58524,6 +58540,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RegistryClient = void 0;
+/* eslint-disable github/no-then */
 const make_fetch_happen_1 = __importDefault(__nccwpck_require__(9525));
 const node_crypto_1 = __importDefault(__nccwpck_require__(6005));
 const constants_1 = __nccwpck_require__(1202);
@@ -58569,12 +58586,8 @@ class RegistryClient {
         }
         let token;
         if (creds.username === '<token>') {
-            try {
-                token = await this.#fetchOAuth2Token(creds, challenge);
-            }
-            catch (_) {
-                // If the OAUth2 token request fails, try to fetch a distribution token
-            }
+            // If the OAUth2 token request fails, try to fetch a distribution token
+            token = await this.#fetchOAuth2Token(creds, challenge).catch(() => undefined);
         }
         if (!token) {
             token = await this.#fetchDistributionToken(creds, challenge);
@@ -58587,7 +58600,6 @@ class RegistryClient {
     // Check the registry API version
     async checkVersion() {
         const response = await this.#fetch(`${this.#baseURL}/v2/`);
-        (0, error_1.checkStatus)(response);
         return response.headers.get(constants_1.HEADER_API_VERSION) || '';
     }
     // Upload a blob to the registry using the post/put method. Calculates the
@@ -58606,35 +58618,26 @@ class RegistryClient {
             };
         }
         // Retrieve upload location (session ID)
-        const postResponse = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/blobs/uploads/`, { method: 'POST' });
-        (0, error_1.checkStatus)(postResponse);
+        const postResponse = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/blobs/uploads/`, { method: 'POST' }).then((0, error_1.ensureStatus)(202));
         const location = postResponse.headers.get(constants_1.HEADER_LOCATION);
         if (!location) {
-            throw new Error('OCI API: missing upload location', {});
+            throw new Error('Missing location for blob upload');
         }
         // Translate location to a full URL
         const uploadLocation = new URL(location.startsWith('/') ? `${this.#baseURL}${location}` : location);
         // Add digest to query string
         uploadLocation.searchParams.set('digest', digest);
         // Upload blob
-        const putResponse = await this.#fetch(uploadLocation.href, {
+        await this.#fetch(uploadLocation.href, {
             method: 'PUT',
             body: blob,
             headers: { [constants_1.HEADER_CONTENT_TYPE]: constants_1.CONTENT_TYPE_OCTET_STREAM }
-        });
-        (0, error_1.checkStatus)(putResponse);
-        if (putResponse.status !== 201) {
-            throw new error_1.HTTPError({
-                message: `OCI API: unexpected status for upload`,
-                status: putResponse.status
-            });
-        }
+        }).then((0, error_1.ensureStatus)(201));
         return { mediaType: constants_1.CONTENT_TYPE_OCTET_STREAM, digest, size };
     }
     // Checks for the existence of a manifest by reference
     async checkManifest(reference) {
-        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'HEAD' });
-        (0, error_1.checkStatus)(response);
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'HEAD' }).then((0, error_1.ensureStatus)(200));
         const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) || /* istanbul ignore next */ '';
         const digest = response.headers.get(constants_1.HEADER_DIGEST) || /* istanbul ignore next */ '';
         const size = Number(response.headers.get(constants_1.HEADER_CONTENT_LENGTH)) ||
@@ -58647,8 +58650,7 @@ class RegistryClient {
             headers: {
                 [constants_1.HEADER_ACCEPT]: `${constants_1.CONTENT_TYPE_OCI_MANIFEST},${constants_1.CONTENT_TYPE_OCI_INDEX}`
             }
-        });
-        (0, error_1.checkStatus)(response);
+        }).then((0, error_1.ensureStatus)(200));
         const body = await response.json();
         const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) || /* istanbul ignore next */ '';
         const digest = response.headers.get(constants_1.HEADER_DIGEST) || /* istanbul ignore next */ '';
@@ -58666,14 +58668,7 @@ class RegistryClient {
         if (options.etag) {
             headers[constants_1.HEADER_IF_MATCH] = options.etag;
         }
-        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'PUT', body: manifest, headers });
-        (0, error_1.checkStatus)(response);
-        if (response.status !== 201) {
-            throw new error_1.HTTPError({
-                message: `OCI API: unexpected status for upload`,
-                status: response.status
-            });
-        }
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'PUT', body: manifest, headers }).then((0, error_1.ensureStatus)(201));
         const subjectDigest = response.headers.get(constants_1.HEADER_OCI_SUBJECT) || undefined;
         return {
             mediaType: contentType,
@@ -58690,9 +58685,7 @@ class RegistryClient {
         // Make token request with basic auth
         const tokenResponse = await this.#fetch(authURL.toString(), {
             headers: { [constants_1.HEADER_AUTHORIZATION]: `Basic ${basicAuth}` }
-        });
-        (0, error_1.checkStatus)(tokenResponse);
-        /* eslint-disable-next-line github/no-then */
+        }).then((0, error_1.ensureStatus)(200));
         return tokenResponse.json().then(json => json.access_token || json.token);
     }
     async #fetchOAuth2Token(creds, challenge) {
@@ -58707,9 +58700,7 @@ class RegistryClient {
         const tokenResponse = await this.#fetch(challenge.realm, {
             method: 'POST',
             body
-        });
-        (0, error_1.checkStatus)(tokenResponse);
-        /* eslint-disable-next-line github/no-then */
+        }).then((0, error_1.ensureStatus)(200));
         return tokenResponse.json().then(json => json.access_token);
     }
     static digest(blob) {

@@ -6,7 +6,7 @@ import {
 import { Credentials } from './credentials'
 import { HTTPError } from './error'
 import { ImageName } from './name'
-import { RegistryClient } from './registry'
+import { RegistryClient, UploadManifestResponse } from './registry'
 
 import type { FetchOptions } from 'make-fetch-happen'
 import type { Descriptor, ImageIndex, ImageManifest } from './types'
@@ -37,54 +37,62 @@ export class OCIImage {
   }
 
   async addArtifact(opts: AddArtifactOptions): Promise<Descriptor> {
-    if (this.#credentials) {
-      await this.#client.signIn(this.#credentials)
-    }
+    let artifactDescriptor: UploadManifestResponse
 
-    // Check that the image exists
-    const imageDescriptor = await this.#client.checkManifest(opts.imageDigest)
+    try {
+      if (this.#credentials) {
+        await this.#client.signIn(this.#credentials)
+      }
 
-    // Upload the artifact blob
-    const artifactBlob = await this.#client.uploadBlob(
-      Buffer.from(opts.artifact)
-    )
+      // Check that the image exists
+      const imageDescriptor = await this.#client.checkManifest(opts.imageDigest)
 
-    // Upload the empty blob (needed for the manifest config)
-    const emptyBlob = await this.#client.uploadBlob(EMPTY_BLOB)
+      // Upload the artifact blob
+      const artifactBlob = await this.#client.uploadBlob(
+        Buffer.from(opts.artifact)
+      )
 
-    // Construct artifact manifest
-    const manifest = buildManifest({
-      artifactDescriptor: { ...artifactBlob, mediaType: opts.mediaType },
-      subjectDescriptor: imageDescriptor,
-      configDescriptor: {
-        ...emptyBlob,
-        mediaType: CONTENT_TYPE_EMPTY_DESCRIPTOR
-      },
-      annotations: opts.annotations
-    })
+      // Upload the empty blob (needed for the manifest config)
+      const emptyBlob = await this.#client.uploadBlob(EMPTY_BLOB)
 
-    /* istanbul ignore if */
-    if (this.#downgrade) {
-      delete manifest.subject
-      delete manifest.artifactType
-    }
-
-    // Upload artifact manifest
-    const artifactDescriptor = await this.#client.uploadManifest(
-      JSON.stringify(manifest)
-    )
-
-    // Manually update the referrers list if the referrers API is not supported.
-    // The lack of a subjectDigest indicates that the referrers API is not
-    // supported.
-    if (artifactDescriptor.subjectDigest === undefined) {
-      await this.#createReferrersIndexByTag({
-        artifact: {
-          ...artifactDescriptor,
-          artifactType: opts.mediaType,
-          annotations: opts.annotations
+      // Construct artifact manifest
+      const manifest = buildManifest({
+        artifactDescriptor: { ...artifactBlob, mediaType: opts.mediaType },
+        subjectDescriptor: imageDescriptor,
+        configDescriptor: {
+          ...emptyBlob,
+          mediaType: CONTENT_TYPE_EMPTY_DESCRIPTOR
         },
-        imageDigest: opts.imageDigest
+        annotations: opts.annotations
+      })
+
+      /* istanbul ignore if */
+      if (this.#downgrade) {
+        delete manifest.subject
+        delete manifest.artifactType
+      }
+
+      // Upload artifact manifest
+      artifactDescriptor = await this.#client.uploadManifest(
+        JSON.stringify(manifest)
+      )
+
+      // Manually update the referrers list if the referrers API is not supported.
+      // The lack of a subjectDigest indicates that the referrers API is not
+      // supported.
+      if (artifactDescriptor.subjectDigest === undefined) {
+        await this.#createReferrersIndexByTag({
+          artifact: {
+            ...artifactDescriptor,
+            artifactType: opts.mediaType,
+            annotations: opts.annotations
+          },
+          imageDigest: opts.imageDigest
+        })
+      }
+    } catch (err) {
+      throw new Error(`Error uploading artifact to container registry`, {
+        cause: err
       })
     }
 

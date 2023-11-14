@@ -199,7 +199,7 @@ describe('OCIImage', () => {
               imageDigest,
               annotations
             })
-          ).rejects.toThrow(/expected referrer manifest type/i)
+          ).rejects.toThrow(/error uploading artifact/i)
         })
       })
 

@@ -7,19 +7,23 @@ export class HTTPError extends Error {
   readonly statusCode: number
 
   constructor({ status, message }: { status: number; message: string }) {
-    super(`(${status}) ${message}`)
+    super(message)
     this.statusCode = status
   }
 }
 
-// Inspects the response status and throws an HTTPError if it is not 2xx
-export const checkStatus = (response: Response): void => {
-  if (response.ok) {
-    return
+// Inspects the response status and throws an HTTPError if it does not match the
+// expected status code
+export const ensureStatus = (
+  expectedStatus: number
+): ((response: Response) => Response) => {
+  return (response: Response): Response => {
+    if (response.status !== expectedStatus) {
+      throw new HTTPError({
+        message: `Error fetching ${response.url} - expected ${expectedStatus}, received ${response.status}`,
+        status: response.status
+      })
+    }
+    return response
   }
-
-  throw new HTTPError({
-    message: `OCI API: ${response.statusText}`,
-    status: response.status
-  })
 }

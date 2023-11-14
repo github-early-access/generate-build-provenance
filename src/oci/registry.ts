@@ -1,3 +1,4 @@
+/* eslint-disable github/no-then */
 import fetch, { FetchInterface, FetchOptions } from 'make-fetch-happen'
 import crypto from 'node:crypto'
 import {
@@ -17,7 +18,7 @@ import {
   HEADER_OCI_SUBJECT
 } from './constants'
 import { Credentials, toBasicAuth } from './credentials'
-import { HTTPError, checkStatus } from './error'
+import { ensureStatus } from './error'
 
 import type { Descriptor } from './types'
 
@@ -90,13 +91,12 @@ export class RegistryClient {
       return
     }
 
-    let token
+    let token: string | undefined
     if (creds.username === '<token>') {
-      try {
-        token = await this.#fetchOAuth2Token(creds, challenge)
-      } catch (_) {
-        // If the OAUth2 token request fails, try to fetch a distribution token
-      }
+      // If the OAUth2 token request fails, try to fetch a distribution token
+      token = await this.#fetchOAuth2Token(creds, challenge).catch(
+        () => undefined
+      )
     }
 
     if (!token) {
@@ -112,7 +112,6 @@ export class RegistryClient {
   // Check the registry API version
   async checkVersion(): Promise<string> {
     const response = await this.#fetch(`${this.#baseURL}/v2/`)
-    checkStatus(response)
 
     return response.headers.get(HEADER_API_VERSION) || ''
   }
@@ -142,12 +141,11 @@ export class RegistryClient {
     const postResponse = await this.#fetch(
       `${this.#baseURL}/v2/${this.#repository}/blobs/uploads/`,
       { method: 'POST' }
-    )
-    checkStatus(postResponse)
+    ).then(ensureStatus(202))
 
     const location = postResponse.headers.get(HEADER_LOCATION)
     if (!location) {
-      throw new Error('OCI API: missing upload location', {})
+      throw new Error('Missing location for blob upload')
     }
 
     // Translate location to a full URL
@@ -159,19 +157,11 @@ export class RegistryClient {
     uploadLocation.searchParams.set('digest', digest)
 
     // Upload blob
-    const putResponse = await this.#fetch(uploadLocation.href, {
+    await this.#fetch(uploadLocation.href, {
       method: 'PUT',
       body: blob,
       headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_OCTET_STREAM }
-    })
-    checkStatus(putResponse)
-
-    if (putResponse.status !== 201) {
-      throw new HTTPError({
-        message: `OCI API: unexpected status for upload`,
-        status: putResponse.status
-      })
-    }
+    }).then(ensureStatus(201))
 
     return { mediaType: CONTENT_TYPE_OCTET_STREAM, digest, size }
   }
@@ -181,8 +171,7 @@ export class RegistryClient {
     const response = await this.#fetch(
       `${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`,
       { method: 'HEAD' }
-    )
-    checkStatus(response)
+    ).then(ensureStatus(200))
 
     const mediaType =
       response.headers.get(HEADER_CONTENT_TYPE) || /* istanbul ignore next */ ''
@@ -204,8 +193,7 @@ export class RegistryClient {
           [HEADER_ACCEPT]: `${CONTENT_TYPE_OCI_MANIFEST},${CONTENT_TYPE_OCI_INDEX}`
         }
       }
-    )
-    checkStatus(response)
+    ).then(ensureStatus(200))
 
     const body = await response.json()
     const mediaType =
@@ -236,15 +224,7 @@ export class RegistryClient {
     const response = await this.#fetch(
       `${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`,
       { method: 'PUT', body: manifest, headers }
-    )
-    checkStatus(response)
-
-    if (response.status !== 201) {
-      throw new HTTPError({
-        message: `OCI API: unexpected status for upload`,
-        status: response.status
-      })
-    }
+    ).then(ensureStatus(201))
 
     const subjectDigest = response.headers.get(HEADER_OCI_SUBJECT) || undefined
 
@@ -269,10 +249,8 @@ export class RegistryClient {
     // Make token request with basic auth
     const tokenResponse = await this.#fetch(authURL.toString(), {
       headers: { [HEADER_AUTHORIZATION]: `Basic ${basicAuth}` }
-    })
-    checkStatus(tokenResponse)
+    }).then(ensureStatus(200))
 
-    /* eslint-disable-next-line github/no-then */
     return tokenResponse.json().then(json => json.access_token || json.token)
   }
 
@@ -292,10 +270,8 @@ export class RegistryClient {
     const tokenResponse = await this.#fetch(challenge.realm, {
       method: 'POST',
       body
-    })
-    checkStatus(tokenResponse)
+    }).then(ensureStatus(200))
 
-    /* eslint-disable-next-line github/no-then */
     return tokenResponse.json().then(json => json.access_token)
   }
 

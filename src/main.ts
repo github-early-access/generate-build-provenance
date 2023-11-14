@@ -84,6 +84,12 @@ export async function run(): Promise<void> {
     core.setFailed(
       err instanceof Error ? err.message : /* istanbul ignore next */ `${err}`
     )
+
+    /* istanbul ignore if */
+    if (err instanceof Error && err.cause) {
+      const innerErr = err.cause
+      core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`)
+    }
   }
 }
 
