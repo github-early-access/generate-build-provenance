@@ -23,7 +23,7 @@ export type ImageManifest = {
   artifactType?: string
   config: Descriptor
   layers: Descriptor[]
-  subject: Descriptor
+  subject?: Descriptor
   annotations?: Record<string, string>
 }
 
@@ -31,7 +31,7 @@ export type ImageIndex = {
   schemaVersion: number
   mediaType: string
   artifactType?: string
-  manifests: Descriptor & { platform?: Platform }[]
+  manifests: (Descriptor & { platform?: Platform })[]
   subject?: Descriptor
   annotations?: Record<string, string>
 }
