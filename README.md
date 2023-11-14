@@ -65,10 +65,12 @@ See [action.yml](action.yml)
     github-token: ''
 ```
 
-## Sample Workflow
+## Sample Workflows
+
+### Identify Artifact by Path
 
 ```yaml
-name: build-artifact
+name: build-with-provenance
 
 on:
   workflow_dispatch:
@@ -81,10 +83,58 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build
+        run: make artifact
+      - name: Attest artifact
       - uses: github-early-access/generate-build-provenance@v1
         with:
-          subject_path: "${{ github.workspace }}/README" # or other file here
+          subject-path: "${{ github.workspace }}/artifact"
+```
+
+### Container Image
+
+```yaml
+name: build-image-with-provenance
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      packages: write
+      contents: read
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push image
+        id: push
+        uses: docker/build-push-action@v5.0.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Attest image
+        uses: github-early-access/generate-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 ```
 
 [1]: https://www.sigstore.dev/
