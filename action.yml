@@ -1,5 +1,5 @@
 name: 'Generate Build Provenance'
-description: 'Provide a description here'
+description: 'Generate provenance attestations for build artifacts'
 author: 'GitHub'
 
 inputs:
