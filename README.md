@@ -22,7 +22,7 @@ permissions:
 1. After your artifact build step, add the following:
 
 ```yaml
-- uses: github-early-access/generate-build-provenance@v1
+- uses: github-early-access/generate-build-provenance@main
   with:
     subject-path: "${{ github.workspace }}/PATH_TO_YOUR_FILE_HERE"
 ```
@@ -32,7 +32,7 @@ permissions:
 See [action.yml](action.yml)
 
 ```yaml
-- uses: github-early-access/generate-build-provenance@v1
+- uses: github-early-access/generate-build-provenance@main
   with:
     # Path to the artifact for which provenance will be generated. Must specify
     # exactly one of "subject-path" or "subject-digest".
@@ -88,7 +88,7 @@ jobs:
       - name: Build
         run: make artifact
       - name: Attest artifact
-      - uses: github-early-access/generate-build-provenance@v1
+      - uses: github-early-access/generate-build-provenance@main
         with:
           subject-path: "${{ github.workspace }}/artifact"
 ```
@@ -130,7 +130,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - name: Attest image
-        uses: github-early-access/generate-build-provenance@v1
+        uses: github-early-access/generate-build-provenance@main
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
