@@ -13,7 +13,7 @@ export class HTTPError extends Error {
 }
 
 // Inspects the response status and throws an HTTPError if it is not 2xx
-export const checkStatus = async (response: Response): Promise<void> => {
+export const checkStatus = (response: Response): void => {
   if (response.ok) {
     return
   }

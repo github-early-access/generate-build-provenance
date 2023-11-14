@@ -1,6 +1,15 @@
 import nock from 'nock'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
+import {
+  CONTENT_TYPE_OCI_MANIFEST,
+  CONTENT_TYPE_OCTET_STREAM,
+  HEADER_API_VERSION,
+  HEADER_CONTENT_LENGTH,
+  HEADER_CONTENT_TYPE,
+  HEADER_DIGEST,
+  HEADER_IF_MATCH
+} from '../../src/oci/constants'
 import { HTTPError } from '../../src/oci/error'
 import { RegistryClient } from '../../src/oci/registry'
 
@@ -8,18 +17,20 @@ describe('RegistryClient', () => {
   const registryName = 'registry.example.com'
   const repoName = 'test'
   const registryURL = `https://${registryName}`
-  const subject = new RegistryClient(registryName, repoName)
+  const subject = new RegistryClient(registryName, repoName, { retry: false })
 
-  describe('versionCheck', () => {
+  describe('checkVersion', () => {
     describe('when the Api-Version header is avaialble', () => {
       beforeEach(() => {
-        nock(registryURL).get('/v2/').reply(200, undefined, {
-          'Docker-Distribution-Api-Version': 'registry/2.0'
-        })
+        nock(registryURL)
+          .get('/v2/')
+          .reply(200, undefined, {
+            [HEADER_API_VERSION]: 'registry/2.0'
+          })
       })
 
       it('returns the version', async () => {
-        const version = await subject.versionCheck()
+        const version = await subject.checkVersion()
         expect(version).toEqual('registry/2.0')
       })
     })
@@ -30,8 +41,105 @@ describe('RegistryClient', () => {
       })
 
       it('returns the empty string', async () => {
-        const version = await subject.versionCheck()
+        const version = await subject.checkVersion()
         expect(version).toEqual('')
+      })
+    })
+  })
+
+  describe('signIn', () => {
+    const creds = { username: 'username', password: 'password' }
+
+    describe('when the client is already signed in', () => {
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(200, undefined, {})
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).resolves.toBeUndefined()
+      })
+    })
+
+    describe('when the registry uses an unsupported auth scheme', () => {
+      const challenge = 'Foo realm="registry.example.com"'
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(401, undefined, {
+            'WWW-Authenticate': challenge
+          })
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).rejects.toThrow(
+          /invalid challenge/i
+        )
+      })
+    })
+
+    describe('when the registry uses basic auth', () => {
+      const challenge = 'Basic realm="registry.example.com"'
+
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(401, undefined, {
+            'WWW-Authenticate': challenge
+          })
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).resolves.toBeUndefined()
+      })
+    })
+
+    describe('when the registry uses an OAuth2 bearer token', () => {
+      /* eslint-disable-next-line no-shadow */
+      const creds = { username: '<token>', password: 'password' }
+      const challenge =
+        'Bearer realm="https://registry.example.com/oauth2/token";service="service";scope="scope"'
+      const accessToken = 'deadbeef'
+
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(401, undefined, {
+            'WWW-Authenticate': challenge
+          })
+          .post('/oauth2/token', {
+            service: 'service',
+            scope: 'scope',
+            grant_type: 'password',
+            username: creds.username,
+            password: creds.password
+          })
+          .reply(200, { access_token: accessToken })
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).resolves.toBeUndefined()
+      })
+    })
+
+    describe('when the registry uses a foundation bearer token', () => {
+      const challenge =
+        'Bearer realm="https://registry.example.com/token";service="service";scope="scope"'
+      const accessToken = 'deadbeef'
+
+      beforeEach(() => {
+        nock(registryURL)
+          .post(`/v2/${repoName}/blobs/uploads/`)
+          .reply(401, undefined, {
+            'WWW-Authenticate': challenge
+          })
+          .get(`/token?service=service&scope=scope`)
+          .reply(200, { token: accessToken })
+      })
+
+      it('returns without error', async () => {
+        await expect(subject.signIn(creds)).resolves.toBeUndefined()
       })
     })
   })
@@ -53,12 +161,15 @@ describe('RegistryClient', () => {
             Location: `${registryURL}/v2/${repoName}/blobs/uploads/123`
           })
           .put(`/v2/${repoName}/blobs/uploads/123?digest=${digest}`)
+          .matchHeader(HEADER_CONTENT_TYPE, CONTENT_TYPE_OCTET_STREAM)
           .reply(201)
       })
 
       it('uploads the blob', async () => {
         const response = await subject.uploadBlob(blob)
-        expect(response).toEqual(digest)
+        expect(response.mediaType).toEqual(CONTENT_TYPE_OCTET_STREAM)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(blob.length)
       })
     })
 
@@ -77,18 +188,26 @@ describe('RegistryClient', () => {
 
       it('uploads the blob', async () => {
         const response = await subject.uploadBlob(blob)
-        expect(response).toEqual(digest)
+        expect(response.mediaType).toEqual(CONTENT_TYPE_OCTET_STREAM)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(blob.length)
       })
     })
 
     describe('when the blob already exists', () => {
       beforeEach(() => {
-        nock(registryURL).head(`/v2/${repoName}/blobs/${digest}`).reply(200)
+        nock(registryURL)
+          .head(`/v2/${repoName}/blobs/${digest}`)
+          .reply(200, undefined, {
+            'Content-Length': blob.length.toString()
+          })
       })
 
       it('returns the blob digest', async () => {
         const response = await subject.uploadBlob(blob)
-        expect(response).toEqual(digest)
+        expect(response.mediaType).toEqual(CONTENT_TYPE_OCTET_STREAM)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(blob.length)
       })
     })
 
@@ -129,13 +248,41 @@ describe('RegistryClient', () => {
     })
   })
 
+  describe('checkManifest', () => {
+    const reference = 'latest'
+    const size = 123
+    const digest = 'sha256:deafbeef'
+
+    describe('when the manifest exists', () => {
+      beforeEach(() => {
+        nock(registryURL)
+          .head(`/v2/${repoName}/manifests/${reference}`)
+          .reply(200, undefined, {
+            [HEADER_CONTENT_TYPE]: CONTENT_TYPE_OCI_MANIFEST,
+            [HEADER_DIGEST]: digest,
+            [HEADER_CONTENT_LENGTH]: size.toString()
+          })
+      })
+
+      it('returns the manifest metadata', async () => {
+        const response = await subject.checkManifest(reference)
+
+        expect(response.mediaType).toEqual(CONTENT_TYPE_OCI_MANIFEST)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(size)
+      })
+    })
+  })
   describe('getManifest', () => {
     describe('when the manifest exists', () => {
       const manifest = { foo: 'bar' }
+
       beforeEach(() => {
         nock(registryURL)
           .get(`/v2/${repoName}/manifests/latest`)
-          .reply(200, manifest, { 'Content-Type': 'application/json' })
+          .reply(200, manifest, {
+            [HEADER_CONTENT_TYPE]: 'application/json'
+          })
       })
 
       it('returns the manifest', async () => {
@@ -176,16 +323,15 @@ describe('RegistryClient', () => {
       beforeEach(() => {
         nock(registryURL)
           .put(`/v2/${repoName}/manifests/${digest}`)
-          .matchHeader(
-            'Content-Type',
-            'application/vnd.oci.image.manifest.v1+json'
-          )
+          .matchHeader(HEADER_CONTENT_TYPE, CONTENT_TYPE_OCI_MANIFEST)
           .reply(201)
       })
 
       it('uploads the manifest', async () => {
         const response = await subject.uploadManifest(manifest)
-        expect(response).toEqual(digest)
+        expect(response.mediaType).toEqual(CONTENT_TYPE_OCI_MANIFEST)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(manifest.length)
       })
     })
 
@@ -196,16 +342,20 @@ describe('RegistryClient', () => {
       beforeEach(() => {
         nock(registryURL)
           .put(`/v2/${repoName}/manifests/${reference}`)
-          .matchHeader('Content-Type', contentType)
+          .matchHeader(HEADER_CONTENT_TYPE, contentType)
+          .matchHeader(HEADER_IF_MATCH, '123')
           .reply(201)
       })
 
       it('uploads the manifest', async () => {
         const response = await subject.uploadManifest(manifest, {
           reference,
-          mediaType: contentType
+          mediaType: contentType,
+          etag: '123'
         })
-        expect(response).toEqual(digest)
+        expect(response.mediaType).toEqual(contentType)
+        expect(response.digest).toEqual(digest)
+        expect(response.size).toEqual(manifest.length)
       })
     })
 

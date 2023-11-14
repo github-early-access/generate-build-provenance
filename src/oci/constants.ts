@@ -1,0 +1,17 @@
+export const CONTENT_TYPE_OCI_INDEX = 'application/vnd.oci.image.index.v1+json'
+export const CONTENT_TYPE_OCI_MANIFEST =
+  'application/vnd.oci.image.manifest.v1+json'
+export const CONTENT_TYPE_OCTET_STREAM = 'application/octet-stream'
+export const CONTENT_TYPE_EMPTY_DESCRIPTOR = 'application/vnd.oci.empty.v1+json'
+
+export const HEADER_ACCEPT = 'Accept'
+export const HEADER_API_VERSION = 'Docker-Distribution-API-Version'
+export const HEADER_AUTHENTICATE = 'WWW-Authenticate'
+export const HEADER_AUTHORIZATION = 'Authorization'
+export const HEADER_CONTENT_LENGTH = 'Content-Length'
+export const HEADER_CONTENT_TYPE = 'Content-Type'
+export const HEADER_DIGEST = 'Docker-Content-Digest'
+export const HEADER_ETAG = 'Etag'
+export const HEADER_IF_MATCH = 'If-Match'
+export const HEADER_LOCATION = 'Location'
+export const HEADER_OCI_SUBJECT = 'OCI-Subject'
