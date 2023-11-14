@@ -58350,6 +58350,10 @@ class OCIImage {
     }
     async addArtifact(opts) {
         let artifactDescriptor;
+        const annotations = {
+            'org.opencontainers.image.created': new Date().toISOString(),
+            ...opts.annotations
+        };
         try {
             if (this.#credentials) {
                 await this.#client.signIn(this.#credentials);
@@ -58368,7 +58372,7 @@ class OCIImage {
                     ...emptyBlob,
                     mediaType: constants_1.CONTENT_TYPE_EMPTY_DESCRIPTOR
                 },
-                annotations: opts.annotations
+                annotations
             });
             /* istanbul ignore if */
             if (this.#downgrade) {
@@ -58385,7 +58389,7 @@ class OCIImage {
                     artifact: {
                         ...artifactDescriptor,
                         artifactType: opts.mediaType,
-                        annotations: opts.annotations
+                        annotations
                     },
                     imageDigest: opts.imageDigest
                 });
