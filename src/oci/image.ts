@@ -39,6 +39,11 @@ export class OCIImage {
   async addArtifact(opts: AddArtifactOptions): Promise<Descriptor> {
     let artifactDescriptor: UploadManifestResponse
 
+    const annotations = {
+      'org.opencontainers.image.created': new Date().toISOString(),
+      ...opts.annotations
+    }
+
     try {
       if (this.#credentials) {
         await this.#client.signIn(this.#credentials)
@@ -63,7 +68,7 @@ export class OCIImage {
           ...emptyBlob,
           mediaType: CONTENT_TYPE_EMPTY_DESCRIPTOR
         },
-        annotations: opts.annotations
+        annotations
       })
 
       /* istanbul ignore if */
@@ -85,7 +90,7 @@ export class OCIImage {
           artifact: {
             ...artifactDescriptor,
             artifactType: opts.mediaType,
-            annotations: opts.annotations
+            annotations
           },
           imageDigest: opts.imageDigest
         })
