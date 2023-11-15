@@ -81,7 +81,7 @@ jobs:
     permissions:
       id-token: write
       packages: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
@@ -109,7 +109,7 @@ jobs:
     permissions:
       id-token: write
       packages: write
-      contents: read
+      contents: write
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
