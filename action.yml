@@ -32,6 +32,12 @@ inputs:
     default: false
     required: false
 
+outputs:
+  bundle:
+    description: >
+      The JSON-serialized Sigstore bundle containing the signed provenance
+      statement and related verification material.
+
 runs:
   using: node20
   main: dist/index.js
