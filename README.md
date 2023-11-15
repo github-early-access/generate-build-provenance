@@ -16,6 +16,7 @@ Within the GitHub Actions workflow which builds some artifact you would like to 
 ```yaml
 permissions:
   id-token: write
+  contents: write
   packages: write
 ```
 
