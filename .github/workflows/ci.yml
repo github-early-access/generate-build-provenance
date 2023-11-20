@@ -134,7 +134,7 @@ jobs:
       - name: Test Local Action
         id: test-action
         env:
-          INPUT_PRIVATE: 'true'
+          INPUT_PRIVATE-SIGNING: 'true'
         uses: ./
         with:
           subject-digest: 'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32'

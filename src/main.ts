@@ -16,11 +16,11 @@ const COLOR_DEFAULT = '\x1B[39m'
  */
 export async function run(): Promise<void> {
   // Provenance visibility will be public ONLY if we can confirm that the
-  // repository is public AND the undocumented "private" arg is NOT set.
+  // repository is public AND the undocumented "private-signing" arg is NOT set.
   // Otherwise, it will be private.
   const visibility =
     github.context.payload.repository?.visibility === 'public' &&
-    core.getInput('private') !== 'true'
+    core.getInput('private-signing') !== 'true'
       ? 'public'
       : 'private'
   core.debug(`Provenance attestation visibility: ${visibility}`)
