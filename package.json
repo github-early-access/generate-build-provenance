@@ -84,11 +84,11 @@
   },
   "devDependencies": {
     "@sigstore/mock": "^0.6.1",
-    "@types/jest": "^29.5.8",
+    "@types/jest": "^29.5.9",
     "@types/make-fetch-happen": "^10.0.4",
-    "@types/node": "^20.9.2",
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
+    "@types/node": "^20.9.3",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
     "@vercel/ncc": "^0.38.1",
     "eslint": "^8.54.0",
     "eslint-plugin-github": "^4.10.1",
@@ -101,6 +101,6 @@
     "prettier": "^3.1.0",
     "prettier-eslint": "^16.1.2",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.3.2"
   }
 }
