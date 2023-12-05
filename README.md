@@ -120,7 +120,8 @@ See [action.yml](action.yml)
 - `subject-path` - Path to the artifact for which the provenance will be
   generated.
 
-  Must specify exactly one of `subject-path` or `subject-digest`.
+  Must specify exactly one of `subject-path` or `subject-digest`. Wildcards can
+  be used to identify more than one artifact.
 
 - `subject-digest` - Digest of the subject for which the provenance will be
   generated.
@@ -132,10 +133,6 @@ See [action.yml](action.yml)
 - `subject-name` - Subject name as it should appear in the provenance statement.
 
   Required when the subject is identified by the `subject-digest` parameter.
-  When the subject is identified by the `subject-path`, the name will be
-  inferred from the supplied path, but can be overridden by providing an
-  explicit `subject-name` value.
-
   When attesting container images, the name should be the fully qualified image
   name.
 
@@ -184,6 +181,46 @@ jobs:
         with:
           subject-path: '${{ github.workspace }}/some-app'
 ```
+
+### Identify Artifacts by Wildcard
+
+If you are generating multiple artifacts, you can generate build provenance for
+each artifact by using a wildcard in the `subject-path` input.
+
+```yaml
+name: build-wildcard-with-provenance
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      id-token: write
+      packages: write
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest artifact
+      - uses: github-early-access/generate-build-provenance@main
+        with:
+          subject-path: 'dist/**/my-bin-*'
+```
+
+For supported wildcards along with behavior and documentation, see
+[@actions/glob][6] which is used internally to search for files.
 
 ### Container Image
 
@@ -251,3 +288,4 @@ jobs:
 [4]: https://cli.github.com/
 [5]:
   https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto
+[6]: https://github.com/actions/toolkit/tree/main/packages/glob#patterns
