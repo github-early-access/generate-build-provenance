@@ -185,7 +185,7 @@ jobs:
 ### Identify Artifacts by Wildcard
 
 If you are generating multiple artifacts, you can generate build provenance for
-each artifact by using a wild card in the `subject-path` input.
+each artifact by using a wildcard in the `subject-path` input.
 
 ```yaml
 name: build-wildcard-with-provenance
