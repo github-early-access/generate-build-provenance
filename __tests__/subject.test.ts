@@ -138,11 +138,12 @@ describe('subjectFromInputs', () => {
       dir = await fs.mkdtemp(tmpDir + path.sep)
 
       // Write file to temp directory
-      const filePath = path.join(dir, filename)
-      await fs.writeFile(filePath, content)
+      await fs.writeFile(path.join(dir, filename), content)
 
-      // Use file path as input
-      process.env['INPUT_SUBJECT-PATH'] = filePath
+      // Add files for glob testing
+      for (let i = 0; i < 3; i++) {
+        await fs.writeFile(path.join(dir, `${filename}-${i}`), content)
+      }
     })
 
     afterEach(async () => {
@@ -151,6 +152,10 @@ describe('subjectFromInputs', () => {
     })
 
     describe('when no name is provided', () => {
+      beforeEach(() => {
+        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, filename)
+      })
+
       it('returns the subject', async () => {
         const subject = await subjectFromInputs()
 
@@ -165,6 +170,7 @@ describe('subjectFromInputs', () => {
       const name = 'mysubject'
 
       beforeEach(() => {
+        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, filename)
         process.env['INPUT_SUBJECT-NAME'] = name
       })
 
@@ -175,6 +181,25 @@ describe('subjectFromInputs', () => {
         expect(subject).toHaveLength(1)
         expect(subject[0].name).toEqual(name)
         expect(subject[0].digest).toEqual({ sha256: expectedDigest })
+      })
+    })
+
+    describe('when a file glob is supplied', () => {
+      beforeEach(async () => {
+        process.env['INPUT_SUBJECT-PATH'] = path.join(dir, 'subject-*')
+      })
+
+      it('returns the multiple subjects', async () => {
+        const subjects = await subjectFromInputs()
+
+        expect(subjects).toBeDefined()
+        expect(subjects).toHaveLength(3)
+
+        /* eslint-disable-next-line github/array-foreach */
+        subjects.forEach((subject, i) => {
+          expect(subject.name).toEqual(`${filename}-${i}`)
+          expect(subject.digest).toEqual({ sha256: expectedDigest })
+        })
       })
     })
   })

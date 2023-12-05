@@ -1,4 +1,5 @@
 import * as core from '@actions/core'
+import * as glob from '@actions/glob'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
@@ -34,7 +35,7 @@ export const subjectFromInputs = async (): Promise<Subject[]> => {
   }
 
   if (subjectPath) {
-    return [await getSubjectFromPath(subjectPath, subjectName)]
+    return await getSubjectFromPath(subjectPath, subjectName)
   } else {
     return [getSubjectFromDigest(subjectDigest, subjectName)]
   }
@@ -45,17 +46,21 @@ export const subjectFromInputs = async (): Promise<Subject[]> => {
 const getSubjectFromPath = async (
   subjectPath: string,
   subjectName?: string
-): Promise<Subject> => {
-  if (!fs.existsSync(subjectPath)) {
+): Promise<Subject[]> => {
+  /* eslint-disable-next-line github/no-then */
+  const files = await glob.create(subjectPath).then(async g => g.glob())
+
+  const subjects = files.map(async file => {
+    const name = subjectName || path.parse(file).base
+    const digest = await digestFile(DIGEST_ALGORITHM, file)
+    return { name, digest: { [DIGEST_ALGORITHM]: digest } }
+  })
+
+  if (subjects.length === 0) {
     throw new Error(`Could not find subject at path ${subjectPath}`)
   }
-  const name = subjectName || path.parse(subjectPath).base
-  const digest = await digestFile(DIGEST_ALGORITHM, subjectPath)
 
-  return {
-    name,
-    digest: { [DIGEST_ALGORITHM]: digest }
-  }
+  return Promise.all(subjects)
 }
 
 // Returns the subject specified by the digest of a file. The digest is returned
