@@ -101,8 +101,9 @@ describe('subjectFromInputs', () => {
         const subject = await subjectFromInputs()
 
         expect(subject).toBeDefined()
-        expect(subject.name).toEqual(name)
-        expect(subject.digest).toEqual({ [alg]: digest })
+        expect(subject).toHaveLength(1)
+        expect(subject[0].name).toEqual(name)
+        expect(subject[0].digest).toEqual({ [alg]: digest })
       })
     })
   })
@@ -154,8 +155,9 @@ describe('subjectFromInputs', () => {
         const subject = await subjectFromInputs()
 
         expect(subject).toBeDefined()
-        expect(subject.name).toEqual(filename)
-        expect(subject.digest).toEqual({ sha256: expectedDigest })
+        expect(subject).toHaveLength(1)
+        expect(subject[0].name).toEqual(filename)
+        expect(subject[0].digest).toEqual({ sha256: expectedDigest })
       })
     })
 
@@ -170,8 +172,9 @@ describe('subjectFromInputs', () => {
         const subject = await subjectFromInputs()
 
         expect(subject).toBeDefined()
-        expect(subject.name).toEqual(name)
-        expect(subject.digest).toEqual({ sha256: expectedDigest })
+        expect(subject).toHaveLength(1)
+        expect(subject[0].name).toEqual(name)
+        expect(subject[0].digest).toEqual({ sha256: expectedDigest })
       })
     })
   })

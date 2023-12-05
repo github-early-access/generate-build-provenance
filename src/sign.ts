@@ -30,9 +30,9 @@ type SignOptions = {
   tsaServerURL?: string
 }
 
-type Visibility = 'public' | 'private'
+export type Visibility = 'public' | 'private'
 
-type Attestation = {
+export type Attestation = {
   bundle: unknown
   certificate: string
   tlogURL?: string

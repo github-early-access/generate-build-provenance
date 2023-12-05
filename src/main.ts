@@ -3,9 +3,9 @@ import * as github from '@actions/github'
 import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
 import { attachArtifactToImage } from './oci'
 import { generateProvenance, SLSA_PREDICATE_V1_TYPE } from './provenance'
-import { signStatement } from './sign'
+import { Attestation, signStatement, Visibility } from './sign'
 import { writeAttestation } from './store'
-import { DIGEST_ALGORITHM, subjectFromInputs } from './subject'
+import { DIGEST_ALGORITHM, Subject, subjectFromInputs } from './subject'
 
 const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
@@ -27,60 +27,17 @@ export async function run(): Promise<void> {
 
   try {
     // Calculate subject from inputs and generate provenance
-    const subject = await subjectFromInputs()
-    const provenance = generateProvenance(subject, process.env)
+    const subjects = await subjectFromInputs()
 
-    core.startGroup(
-      highlight(
-        `Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`
-      )
+    // Generate attestations for each subject serially
+    const attestations = await Promise.all(
+      subjects.map(async subject => await attest(subject, visibility))
     )
-    core.info(JSON.stringify(provenance, null, 2))
-    core.endGroup()
 
-    // Sign provenance w/ Sigstore
-    const attestation = await signStatement(provenance, visibility)
-
-    core.startGroup(highlight('Attestation signed using ephemeral certificate'))
-    core.info(attestation.certificate)
-    core.endGroup()
-
-    if (attestation.tlogURL) {
-      core.info(
-        highlight('Attestation signature uploaded to Rekor transparency log')
-      )
-      core.info(attestation.tlogURL)
+    // Set bundle as action output, but ONLY IF there is a single attestation
+    if (attestations.length === 1) {
+      core.setOutput('bundle', attestations[0].bundle)
     }
-
-    const attestationURL = await writeAttestation(
-      attestation.bundle,
-      core.getInput('github-token')
-    )
-
-    core.info(highlight('Attestation uploaded to repository'))
-    core.info(attestationURL)
-    core.summary.addHeading('Attestation Created', 3)
-    core.summary.addLink(
-      `${subject.name}@${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
-      attestationURL
-    )
-    core.summary.write()
-
-    if (core.getBooleanInput('push-to-registry', { required: false })) {
-      const artifact = await attachArtifactToImage({
-        imageName: subject.name,
-        imageDigest: `${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
-        artifact: JSON.stringify(attestation.bundle),
-        mediaType: BUNDLE_V02_MEDIA_TYPE,
-        annotations: {
-          'dev.sigstore.bundle/predicateType': SLSA_PREDICATE_V1_TYPE
-        }
-      })
-      core.info(highlight('Attestation uploaded to registry'))
-      core.info(`${subject.name}@${artifact.digest}`)
-    }
-
-    core.setOutput('bundle', attestation.bundle)
   } catch (err) {
     // Fail the workflow run if an error occurs
     core.setFailed(
@@ -93,6 +50,65 @@ export async function run(): Promise<void> {
       core.debug(innerErr instanceof Error ? innerErr.message : `${innerErr}}`)
     }
   }
+}
+
+const attest = async (
+  subject: Subject,
+  visibility: Visibility
+): Promise<Attestation> => {
+  const provenance = generateProvenance(subject, process.env)
+
+  core.startGroup(
+    highlight(
+      `Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`
+    )
+  )
+  core.info(JSON.stringify(provenance, null, 2))
+  core.endGroup()
+
+  // Sign provenance w/ Sigstore
+  const attestation = await signStatement(provenance, visibility)
+
+  core.startGroup(highlight('Attestation signed using ephemeral certificate'))
+  core.info(attestation.certificate)
+  core.endGroup()
+
+  if (attestation.tlogURL) {
+    core.info(
+      highlight('Attestation signature uploaded to Rekor transparency log')
+    )
+    core.info(attestation.tlogURL)
+  }
+
+  const attestationURL = await writeAttestation(
+    attestation.bundle,
+    core.getInput('github-token')
+  )
+
+  core.info(highlight('Attestation uploaded to repository'))
+  core.info(attestationURL)
+  core.summary.addHeading('Attestation Created', 3)
+  core.summary.addLink(
+    `${subject.name}@${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
+    attestationURL
+  )
+  core.summary.write()
+
+  if (core.getBooleanInput('push-to-registry', { required: false })) {
+    const artifact = await attachArtifactToImage({
+      imageName: subject.name,
+      imageDigest: `${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
+      artifact: JSON.stringify(attestation.bundle),
+      mediaType: BUNDLE_V02_MEDIA_TYPE,
+      annotations: {
+        'dev.sigstore.bundle/predicateType': SLSA_PREDICATE_V1_TYPE
+      }
+    })
+    core.info(highlight('Attestation uploaded to registry'))
+    core.info(`${subject.name}@${artifact.digest}`)
+  }
+
+  return attestation
 }
 
 const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`

@@ -14,7 +14,7 @@ export type Subject = {
 // specified as a path to a file or as a digest. If a path is provided, the
 // file's digest is calculated and returned along with the subject's name. If a
 // digest is provided, the name must also be provided.
-export const subjectFromInputs = async (): Promise<Subject> => {
+export const subjectFromInputs = async (): Promise<Subject[]> => {
   const subjectPath = core.getInput('subject-path', { required: false })
   const subjectDigest = core.getInput('subject-digest', { required: false })
   const subjectName = core.getInput('subject-name', { required: false })
@@ -34,9 +34,9 @@ export const subjectFromInputs = async (): Promise<Subject> => {
   }
 
   if (subjectPath) {
-    return getSubjectFromPath(subjectPath, subjectName)
+    return [await getSubjectFromPath(subjectPath, subjectName)]
   } else {
-    return getSubjectFromDigest(subjectDigest, subjectName)
+    return [getSubjectFromDigest(subjectDigest, subjectName)]
   }
 }
 

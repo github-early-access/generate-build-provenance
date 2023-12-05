@@ -58169,40 +58169,13 @@ async function run() {
     core.debug(`Provenance attestation visibility: ${visibility}`);
     try {
         // Calculate subject from inputs and generate provenance
-        const subject = await (0, subject_1.subjectFromInputs)();
-        const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
-        core.startGroup(highlight(`Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`));
-        core.info(JSON.stringify(provenance, null, 2));
-        core.endGroup();
-        // Sign provenance w/ Sigstore
-        const attestation = await (0, sign_1.signStatement)(provenance, visibility);
-        core.startGroup(highlight('Attestation signed using ephemeral certificate'));
-        core.info(attestation.certificate);
-        core.endGroup();
-        if (attestation.tlogURL) {
-            core.info(highlight('Attestation signature uploaded to Rekor transparency log'));
-            core.info(attestation.tlogURL);
+        const subjects = await (0, subject_1.subjectFromInputs)();
+        // Generate attestations for each subject serially
+        const attestations = await Promise.all(subjects.map(async (subject) => await attest(subject, visibility)));
+        // Set bundle as action output, but ONLY IF there is a single attestation
+        if (attestations.length === 1) {
+            core.setOutput('bundle', attestations[0].bundle);
         }
-        const attestationURL = await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
-        core.info(highlight('Attestation uploaded to repository'));
-        core.info(attestationURL);
-        core.summary.addHeading('Attestation Created', 3);
-        core.summary.addLink(`${subject.name}@${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`, attestationURL);
-        core.summary.write();
-        if (core.getBooleanInput('push-to-registry', { required: false })) {
-            const artifact = await (0, oci_1.attachArtifactToImage)({
-                imageName: subject.name,
-                imageDigest: `${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`,
-                artifact: JSON.stringify(attestation.bundle),
-                mediaType: bundle_1.BUNDLE_V02_MEDIA_TYPE,
-                annotations: {
-                    'dev.sigstore.bundle/predicateType': provenance_1.SLSA_PREDICATE_V1_TYPE
-                }
-            });
-            core.info(highlight('Attestation uploaded to registry'));
-            core.info(`${subject.name}@${artifact.digest}`);
-        }
-        core.setOutput('bundle', attestation.bundle);
     }
     catch (err) {
         // Fail the workflow run if an error occurs
@@ -58215,6 +58188,41 @@ async function run() {
     }
 }
 exports.run = run;
+const attest = async (subject, visibility) => {
+    const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
+    core.startGroup(highlight(`Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`));
+    core.info(JSON.stringify(provenance, null, 2));
+    core.endGroup();
+    // Sign provenance w/ Sigstore
+    const attestation = await (0, sign_1.signStatement)(provenance, visibility);
+    core.startGroup(highlight('Attestation signed using ephemeral certificate'));
+    core.info(attestation.certificate);
+    core.endGroup();
+    if (attestation.tlogURL) {
+        core.info(highlight('Attestation signature uploaded to Rekor transparency log'));
+        core.info(attestation.tlogURL);
+    }
+    const attestationURL = await (0, store_1.writeAttestation)(attestation.bundle, core.getInput('github-token'));
+    core.info(highlight('Attestation uploaded to repository'));
+    core.info(attestationURL);
+    core.summary.addHeading('Attestation Created', 3);
+    core.summary.addLink(`${subject.name}@${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`, attestationURL);
+    core.summary.write();
+    if (core.getBooleanInput('push-to-registry', { required: false })) {
+        const artifact = await (0, oci_1.attachArtifactToImage)({
+            imageName: subject.name,
+            imageDigest: `${subject_1.DIGEST_ALGORITHM}:${subject.digest[subject_1.DIGEST_ALGORITHM]}`,
+            artifact: JSON.stringify(attestation.bundle),
+            mediaType: bundle_1.BUNDLE_V02_MEDIA_TYPE,
+            annotations: {
+                'dev.sigstore.bundle/predicateType': provenance_1.SLSA_PREDICATE_V1_TYPE
+            }
+        });
+        core.info(highlight('Attestation uploaded to registry'));
+        core.info(`${subject.name}@${artifact.digest}`);
+    }
+    return attestation;
+};
 const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
 
 
@@ -59002,10 +59010,10 @@ const subjectFromInputs = async () => {
         throw new Error('subject-name must be provided when using subject-digest');
     }
     if (subjectPath) {
-        return getSubjectFromPath(subjectPath, subjectName);
+        return [await getSubjectFromPath(subjectPath, subjectName)];
     }
     else {
-        return getSubjectFromDigest(subjectDigest, subjectName);
+        return [getSubjectFromDigest(subjectDigest, subjectName)];
     }
 };
 exports.subjectFromInputs = subjectFromInputs;
