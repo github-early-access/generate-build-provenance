@@ -36,7 +36,7 @@ jobs:
       - name: Foo
         run: docker ps -a
       - name: Echo
-        run: echo ${{ job.services.registry }}
+        run: echo ${{ job.services.registry.id }}
       - name: Build Dockerfile
         run: |
           cat <<EOF > Dockerfile
