@@ -28,6 +28,13 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Restart registry
+        uses: docker://docker@sha256:6bb6b266d173937b4859871f556ecf8e1d822ea197f821c8b1e784452da13e55 # 24.0.7
+        with:
+          args: docker restart registry
+
+      - name: Foo
+        run: docker version
       - name: Build Dockerfile
         run: |
           cat <<EOF > Dockerfile
