@@ -31,7 +31,7 @@ jobs:
       - name: Restart registry
         uses: docker://docker@sha256:6bb6b266d173937b4859871f556ecf8e1d822ea197f821c8b1e784452da13e55 # 24.0.7
         with:
-          args: docker restart registry
+          args: docker ps -a
 
       - name: Foo
         run: docker version
