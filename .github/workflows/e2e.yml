@@ -18,8 +18,14 @@ jobs:
     services:
       registry:
         image: registry@sha256:860f379a011eddfab604d9acfe3cf50b2d6e958026fb0f977132b0b083b1a3d7 # 2.8.3
+        volumes:
+          - ${{ github.workspace }}/auth:/auth
         ports:
           - 5000:5000
+        env:
+          REGISTRY_AUTH: htpasswd
+          REGISTRY_AUTH_HTPASSWD_REALM: Registry Realm
+          REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     env:
       REGISTRY: localhost:5000
       IMAGE_NAME: test
@@ -29,11 +35,10 @@ jobs:
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: htpasswd
-        id: htpasswd
-        run: npx htpasswd --bcrypt --batch --nofile user pass
-      - name: Restart registry
-        run: docker restart ${{ job.services.registry.id }}
-
+        run: |
+          mkdir auth
+          npx htpasswd --bcrypt --batch --nofile user pass > auth/htpasswd
+          docker restart ${{ job.services.registry.id }}
       - name: Build Dockerfile
         run: |
           cat <<EOF > Dockerfile
