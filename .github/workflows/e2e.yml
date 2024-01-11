@@ -28,15 +28,9 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - name: Foo
-        id: foo
-        uses: docker://httpd:2
-        with:
-          entrypoint: htpasswd
-          args: -Bbn user password >> "$GITHUB_OUTPUT"
-      - name: Echo
-        id: echo
-        run: echo ${{ steps.foo.outputs }}
+      - name: htpasswd
+        id: htpasswd
+        run: npx htpasswd --bcrypt --batch --nofile user pass
       - name: Restart registry
         run: docker restart ${{ job.services.registry.id }}
 
