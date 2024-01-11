@@ -33,7 +33,10 @@ jobs:
         uses: docker://httpd:2
         with:
           entrypoint: htpasswd
-          args: -Bbn user password
+          args: -Bbn user password >> "$GITHUB_OUTPUT"
+      - name: Echo
+        id: echo
+        run: echo ${{ steps.foo.outputs }}
       - name: Restart registry
         run: docker restart ${{ job.services.registry.id }}
 
