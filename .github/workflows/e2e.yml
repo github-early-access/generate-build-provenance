@@ -28,8 +28,15 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Foo
+        id: foo
+        uses: docker://httpd:2
+        with:
+          entrypoint: htpasswd
+          args: -Bbn user password
       - name: Restart registry
         run: docker restart ${{ job.services.registry.id }}
+
       - name: Build Dockerfile
         run: |
           cat <<EOF > Dockerfile
