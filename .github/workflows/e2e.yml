@@ -34,7 +34,9 @@ jobs:
           args: docker ps -a
 
       - name: Foo
-        run: docker version
+        run: docker ps -a
+      - name: Echo
+        run: echo ${{ job.services.registry }}
       - name: Build Dockerfile
         run: |
           cat <<EOF > Dockerfile
