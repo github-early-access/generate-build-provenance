@@ -30,13 +30,15 @@ jobs:
       REGISTRY: localhost:5000
       IMAGE_NAME: test
       IMAGE_TAG: latest
+      USERNAME: ${{ github.actor }}
+      PASSWORD: password
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: htpasswd
         run: |
-          npx htpasswd --bcrypt --batch --nofile user pass > ${{ runner.temp }}/htpasswd
+          npx htpasswd --bcrypt --batch --nofile $USERNAME $PASSWORD > ${{ runner.temp }}/htpasswd
           docker run -d \
             -p "5000:5000" \
             -e "REGISTRY_AUTH=htpasswd" \
@@ -51,6 +53,12 @@ jobs:
           FROM scratch
           COPY README.md .
           EOF
+      - name: Login to GHCR
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.USERNAME }}
+          password: ${{ env.PASSWORD }}
       - name: Build and push container image
         id: push
         uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
