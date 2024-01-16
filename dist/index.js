@@ -9836,10 +9836,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 const protobuf_specs_1 = __nccwpck_require__(530);
+const bundle_1 = __nccwpck_require__(2712);
 const validate_1 = __nccwpck_require__(9599);
 const bundleFromJSON = (obj) => {
     const bundle = protobuf_specs_1.Bundle.fromJSON(obj);
     (0, validate_1.assertBundle)(bundle);
+    if (bundle.mediaType === bundle_1.BUNDLE_V01_MEDIA_TYPE) {
+        (0, validate_1.assertBundleV01)(bundle);
+    }
+    else {
+        (0, validate_1.assertBundleLatest)(bundle);
+    }
     return bundle;
 };
 exports.bundleFromJSON = bundleFromJSON;
@@ -10023,6 +10030,1911 @@ function assertBundleLatest(b) {
     }
 }
 exports.assertBundleLatest = assertBundleLatest;
+
+
+/***/ }),
+
+/***/ 6136:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ASN1TypeError = exports.ASN1ParseError = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+class ASN1ParseError extends Error {
+}
+exports.ASN1ParseError = ASN1ParseError;
+class ASN1TypeError extends Error {
+}
+exports.ASN1TypeError = ASN1TypeError;
+
+
+/***/ }),
+
+/***/ 4095:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ASN1Obj = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+var obj_1 = __nccwpck_require__(2988);
+Object.defineProperty(exports, "ASN1Obj", ({ enumerable: true, get: function () { return obj_1.ASN1Obj; } }));
+
+
+/***/ }),
+
+/***/ 5088:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.encodeLength = exports.decodeLength = void 0;
+const error_1 = __nccwpck_require__(6136);
+// Decodes the length of a DER-encoded ANS.1 element from the supplied stream.
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-encoded-length-and-value-bytes
+function decodeLength(stream) {
+    const buf = stream.getUint8();
+    // If the most significant bit is UNSET the length is just the value of the
+    // byte.
+    if ((buf & 0x80) === 0x00) {
+        return buf;
+    }
+    // Otherwise, the lower 7 bits of the first byte indicate the number of bytes
+    // that follow to encode the length.
+    const byteCount = buf & 0x7f;
+    // Ensure the encoded length can safely fit in a JS number.
+    if (byteCount > 6) {
+        throw new error_1.ASN1ParseError('length exceeds 6 byte limit');
+    }
+    // Iterate over the bytes that encode the length.
+    let len = 0;
+    for (let i = 0; i < byteCount; i++) {
+        len = len * 256 + stream.getUint8();
+    }
+    // This is a valid ASN.1 length encoding, but we don't support it.
+    if (len === 0) {
+        throw new error_1.ASN1ParseError('indefinite length encoding not supported');
+    }
+    return len;
+}
+exports.decodeLength = decodeLength;
+// Translates the supplied value to a DER-encoded length.
+function encodeLength(len) {
+    if (len < 128) {
+        return Buffer.from([len]);
+    }
+    // Bitwise operations on large numbers are not supported in JS, so we need to
+    // use BigInts.
+    let val = BigInt(len);
+    const bytes = [];
+    while (val > 0n) {
+        bytes.unshift(Number(val & 255n));
+        val = val >> 8n;
+    }
+    return Buffer.from([0x80 | bytes.length, ...bytes]);
+}
+exports.encodeLength = encodeLength;
+
+
+/***/ }),
+
+/***/ 2988:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ASN1Obj = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const stream_1 = __nccwpck_require__(2283);
+const error_1 = __nccwpck_require__(6136);
+const length_1 = __nccwpck_require__(5088);
+const parse_1 = __nccwpck_require__(3947);
+const tag_1 = __nccwpck_require__(3725);
+class ASN1Obj {
+    constructor(tag, value, subs) {
+        this.tag = tag;
+        this.value = value;
+        this.subs = subs;
+    }
+    // Constructs an ASN.1 object from a Buffer of DER-encoded bytes.
+    static parseBuffer(buf) {
+        return parseStream(new stream_1.ByteStream(buf));
+    }
+    toDER() {
+        const valueStream = new stream_1.ByteStream();
+        if (this.subs.length > 0) {
+            for (const sub of this.subs) {
+                valueStream.appendView(sub.toDER());
+            }
+        }
+        else {
+            valueStream.appendView(this.value);
+        }
+        const value = valueStream.buffer;
+        // Concat tag/length/value
+        const obj = new stream_1.ByteStream();
+        obj.appendChar(this.tag.toDER());
+        obj.appendView((0, length_1.encodeLength)(value.length));
+        obj.appendView(value);
+        return obj.buffer;
+    }
+    /////////////////////////////////////////////////////////////////////////////
+    // Convenience methods for parsing ASN.1 primitives into JS types
+    // Returns the ASN.1 object's value as a boolean. Throws an error if the
+    // object is not a boolean.
+    toBoolean() {
+        if (!this.tag.isBoolean()) {
+            throw new error_1.ASN1TypeError('not a boolean');
+        }
+        return (0, parse_1.parseBoolean)(this.value);
+    }
+    // Returns the ASN.1 object's value as a BigInt. Throws an error if the
+    // object is not an integer.
+    toInteger() {
+        if (!this.tag.isInteger()) {
+            throw new error_1.ASN1TypeError('not an integer');
+        }
+        return (0, parse_1.parseInteger)(this.value);
+    }
+    // Returns the ASN.1 object's value as an OID string. Throws an error if the
+    // object is not an OID.
+    toOID() {
+        if (!this.tag.isOID()) {
+            throw new error_1.ASN1TypeError('not an OID');
+        }
+        return (0, parse_1.parseOID)(this.value);
+    }
+    // Returns the ASN.1 object's value as a Date. Throws an error if the object
+    // is not either a UTCTime or a GeneralizedTime.
+    toDate() {
+        switch (true) {
+            case this.tag.isUTCTime():
+                return (0, parse_1.parseTime)(this.value, true);
+            case this.tag.isGeneralizedTime():
+                return (0, parse_1.parseTime)(this.value, false);
+            default:
+                throw new error_1.ASN1TypeError('not a date');
+        }
+    }
+    // Returns the ASN.1 object's value as a number[] where each number is the
+    // value of a bit in the bit string. Throws an error if the object is not a
+    // bit string.
+    toBitString() {
+        if (!this.tag.isBitString()) {
+            throw new error_1.ASN1TypeError('not a bit string');
+        }
+        return (0, parse_1.parseBitString)(this.value);
+    }
+}
+exports.ASN1Obj = ASN1Obj;
+/////////////////////////////////////////////////////////////////////////////
+// Internal stream parsing functions
+function parseStream(stream) {
+    // Parse tag, length, and value from stream
+    const tag = new tag_1.ASN1Tag(stream.getUint8());
+    const len = (0, length_1.decodeLength)(stream);
+    const value = stream.slice(stream.position, len);
+    const start = stream.position;
+    let subs = [];
+    // If the object is constructed, parse its children. Sometimes, children
+    // are embedded in OCTESTRING objects, so we need to check those
+    // for children as well.
+    if (tag.constructed) {
+        subs = collectSubs(stream, len);
+    }
+    else if (tag.isOctetString()) {
+        // Attempt to parse children of OCTETSTRING objects. If anything fails,
+        // assume the object is not constructed and treat as primitive.
+        try {
+            subs = collectSubs(stream, len);
+        }
+        catch (e) {
+            // Fail silently and treat as primitive
+        }
+    }
+    // If there are no children, move stream cursor to the end of the object
+    if (subs.length === 0) {
+        stream.seek(start + len);
+    }
+    return new ASN1Obj(tag, value, subs);
+}
+function collectSubs(stream, len) {
+    // Calculate end of object content
+    const end = stream.position + len;
+    // Make sure there are enough bytes left in the stream. This should never
+    // happen, cause it'll get caught when the stream is sliced in parseStream.
+    // Leaving as an extra check just in case.
+    /* istanbul ignore if */
+    if (end > stream.length) {
+        throw new error_1.ASN1ParseError('invalid length');
+    }
+    // Parse all children
+    const subs = [];
+    while (stream.position < end) {
+        subs.push(parseStream(stream));
+    }
+    // When we're done parsing children, we should be at the end of the object
+    if (stream.position !== end) {
+        throw new error_1.ASN1ParseError('invalid length');
+    }
+    return subs;
+}
+
+
+/***/ }),
+
+/***/ 3947:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parseBitString = exports.parseBoolean = exports.parseOID = exports.parseTime = exports.parseStringASCII = exports.parseInteger = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const RE_TIME_SHORT_YEAR = /^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/;
+const RE_TIME_LONG_YEAR = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\.\d{3})?Z$/;
+// Parse a BigInt from the DER-encoded buffer
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-integer
+function parseInteger(buf) {
+    let pos = 0;
+    const end = buf.length;
+    let val = buf[pos];
+    const neg = val > 0x7f;
+    // Consume any padding bytes
+    const pad = neg ? 0xff : 0x00;
+    while (val == pad && ++pos < end) {
+        val = buf[pos];
+    }
+    // Calculate remaining bytes to read
+    const len = end - pos;
+    if (len === 0)
+        return BigInt(neg ? -1 : 0);
+    // Handle two's complement for negative numbers
+    val = neg ? val - 256 : val;
+    // Parse remaining bytes
+    let n = BigInt(val);
+    for (let i = pos + 1; i < end; ++i) {
+        n = n * BigInt(256) + BigInt(buf[i]);
+    }
+    return n;
+}
+exports.parseInteger = parseInteger;
+// Parse an ASCII string from the DER-encoded buffer
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-basic-types#boolean
+function parseStringASCII(buf) {
+    return buf.toString('ascii');
+}
+exports.parseStringASCII = parseStringASCII;
+// Parse a Date from the DER-encoded buffer
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.5.1
+function parseTime(buf, shortYear) {
+    const timeStr = parseStringASCII(buf);
+    // Parse the time string into matches - captured groups start at index 1
+    const m = shortYear
+        ? RE_TIME_SHORT_YEAR.exec(timeStr)
+        : RE_TIME_LONG_YEAR.exec(timeStr);
+    if (!m) {
+        throw new Error('invalid time');
+    }
+    // Translate dates with a 2-digit year to 4 digits per the spec
+    if (shortYear) {
+        let year = Number(m[1]);
+        year += year >= 50 ? 1900 : 2000;
+        m[1] = year.toString();
+    }
+    // Translate to ISO8601 format and parse
+    return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`);
+}
+exports.parseTime = parseTime;
+// Parse an OID from the DER-encoded buffer
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-object-identifier
+function parseOID(buf) {
+    let pos = 0;
+    const end = buf.length;
+    // Consume first byte which encodes the first two OID components
+    let n = buf[pos++];
+    const first = Math.floor(n / 40);
+    const second = n % 40;
+    let oid = `${first}.${second}`;
+    // Consume remaining bytes
+    let val = 0;
+    for (; pos < end; ++pos) {
+        n = buf[pos];
+        val = (val << 7) + (n & 0x7f);
+        // If the left-most bit is NOT set, then this is the last byte in the
+        // sequence and we can add the value to the OID and reset the accumulator
+        if ((n & 0x80) === 0) {
+            oid += `.${val}`;
+            val = 0;
+        }
+    }
+    return oid;
+}
+exports.parseOID = parseOID;
+// Parse a boolean from the DER-encoded buffer
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-basic-types#boolean
+function parseBoolean(buf) {
+    return buf[0] !== 0;
+}
+exports.parseBoolean = parseBoolean;
+// Parse a bit string from the DER-encoded buffer
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-bit-string
+function parseBitString(buf) {
+    // First byte tell us how many unused bits are in the last byte
+    const unused = buf[0];
+    const start = 1;
+    const end = buf.length;
+    const bits = [];
+    for (let i = start; i < end; ++i) {
+        const byte = buf[i];
+        // The skip value is only used for the last byte
+        const skip = i === end - 1 ? unused : 0;
+        // Iterate over each bit in the byte (most significant first)
+        for (let j = 7; j >= skip; --j) {
+            // Read the bit and add it to the bit string
+            bits.push((byte >> j) & 0x01);
+        }
+    }
+    return bits;
+}
+exports.parseBitString = parseBitString;
+
+
+/***/ }),
+
+/***/ 3725:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ASN1Tag = exports.UNIVERSAL_TAG = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const error_1 = __nccwpck_require__(6136);
+exports.UNIVERSAL_TAG = {
+    BOOLEAN: 0x01,
+    INTEGER: 0x02,
+    BIT_STRING: 0x03,
+    OCTET_STRING: 0x04,
+    OBJECT_IDENTIFIER: 0x06,
+    SEQUENCE: 0x10,
+    SET: 0x11,
+    PRINTABLE_STRING: 0x13,
+    UTC_TIME: 0x17,
+    GENERALIZED_TIME: 0x18,
+};
+const TAG_CLASS = {
+    UNIVERSAL: 0x00,
+    APPLICATION: 0x01,
+    CONTEXT_SPECIFIC: 0x02,
+    PRIVATE: 0x03,
+};
+// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-encoded-tag-bytes
+class ASN1Tag {
+    constructor(enc) {
+        // Bits 0 through 4 are the tag number
+        this.number = enc & 0x1f;
+        // Bit 5 is the constructed bit
+        this.constructed = (enc & 0x20) === 0x20;
+        // Bit 6 & 7 are the class
+        this.class = enc >> 6;
+        if (this.number === 0x1f) {
+            throw new error_1.ASN1ParseError('long form tags not supported');
+        }
+        if (this.class === TAG_CLASS.UNIVERSAL && this.number === 0x00) {
+            throw new error_1.ASN1ParseError('unsupported tag 0x00');
+        }
+    }
+    isUniversal() {
+        return this.class === TAG_CLASS.UNIVERSAL;
+    }
+    isContextSpecific(num) {
+        const res = this.class === TAG_CLASS.CONTEXT_SPECIFIC;
+        return num !== undefined ? res && this.number === num : res;
+    }
+    isBoolean() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.BOOLEAN;
+    }
+    isInteger() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.INTEGER;
+    }
+    isBitString() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.BIT_STRING;
+    }
+    isOctetString() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.OCTET_STRING;
+    }
+    isOID() {
+        return (this.isUniversal() && this.number === exports.UNIVERSAL_TAG.OBJECT_IDENTIFIER);
+    }
+    isUTCTime() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.UTC_TIME;
+    }
+    isGeneralizedTime() {
+        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.GENERALIZED_TIME;
+    }
+    toDER() {
+        return this.number | (this.constructed ? 0x20 : 0x00) | (this.class << 6);
+    }
+}
+exports.ASN1Tag = ASN1Tag;
+
+
+/***/ }),
+
+/***/ 3914:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.bufferEqual = exports.verify = exports.hash = exports.digest = exports.createPublicKey = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const crypto_1 = __importDefault(__nccwpck_require__(6113));
+const SHA256_ALGORITHM = 'sha256';
+function createPublicKey(key) {
+    if (typeof key === 'string') {
+        return crypto_1.default.createPublicKey(key);
+    }
+    else {
+        return crypto_1.default.createPublicKey({ key, format: 'der', type: 'spki' });
+    }
+}
+exports.createPublicKey = createPublicKey;
+function digest(algorithm, ...data) {
+    const hash = crypto_1.default.createHash(algorithm);
+    for (const d of data) {
+        hash.update(d);
+    }
+    return hash.digest();
+}
+exports.digest = digest;
+// TODO: deprecate this in favor of digest()
+function hash(...data) {
+    const hash = crypto_1.default.createHash(SHA256_ALGORITHM);
+    for (const d of data) {
+        hash.update(d);
+    }
+    return hash.digest();
+}
+exports.hash = hash;
+function verify(data, key, signature, algorithm) {
+    // The try/catch is to work around an issue in Node 14.x where verify throws
+    // an error in some scenarios if the signature is invalid.
+    try {
+        return crypto_1.default.verify(algorithm, data, key, signature);
+    }
+    catch (e) {
+        /* istanbul ignore next */
+        return false;
+    }
+}
+exports.verify = verify;
+function bufferEqual(a, b) {
+    try {
+        return crypto_1.default.timingSafeEqual(a, b);
+    }
+    catch {
+        /* istanbul ignore next */
+        return false;
+    }
+}
+exports.bufferEqual = bufferEqual;
+
+
+/***/ }),
+
+/***/ 9892:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.preAuthEncoding = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const PAE_PREFIX = 'DSSEv1';
+// DSSE Pre-Authentication Encoding
+function preAuthEncoding(payloadType, payload) {
+    const prefix = [
+        PAE_PREFIX,
+        payloadType.length,
+        payloadType,
+        payload.length,
+        '',
+    ].join(' ');
+    return Buffer.concat([Buffer.from(prefix, 'ascii'), payload]);
+}
+exports.preAuthEncoding = preAuthEncoding;
+
+
+/***/ }),
+
+/***/ 7496:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.base64Decode = exports.base64Encode = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const BASE64_ENCODING = 'base64';
+const UTF8_ENCODING = 'utf-8';
+function base64Encode(str) {
+    return Buffer.from(str, UTF8_ENCODING).toString(BASE64_ENCODING);
+}
+exports.base64Encode = base64Encode;
+function base64Decode(str) {
+    return Buffer.from(str, BASE64_ENCODING).toString(UTF8_ENCODING);
+}
+exports.base64Decode = base64Decode;
+
+
+/***/ }),
+
+/***/ 3352:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.X509SCTExtension = exports.X509Certificate = exports.EXTENSION_OID_SCT = exports.ByteStream = exports.RFC3161Timestamp = exports.pem = exports.json = exports.encoding = exports.dsse = exports.crypto = exports.ASN1Obj = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+var asn1_1 = __nccwpck_require__(4095);
+Object.defineProperty(exports, "ASN1Obj", ({ enumerable: true, get: function () { return asn1_1.ASN1Obj; } }));
+exports.crypto = __importStar(__nccwpck_require__(3914));
+exports.dsse = __importStar(__nccwpck_require__(9892));
+exports.encoding = __importStar(__nccwpck_require__(7496));
+exports.json = __importStar(__nccwpck_require__(9022));
+exports.pem = __importStar(__nccwpck_require__(5225));
+var rfc3161_1 = __nccwpck_require__(7411);
+Object.defineProperty(exports, "RFC3161Timestamp", ({ enumerable: true, get: function () { return rfc3161_1.RFC3161Timestamp; } }));
+var stream_1 = __nccwpck_require__(2283);
+Object.defineProperty(exports, "ByteStream", ({ enumerable: true, get: function () { return stream_1.ByteStream; } }));
+var x509_1 = __nccwpck_require__(5500);
+Object.defineProperty(exports, "EXTENSION_OID_SCT", ({ enumerable: true, get: function () { return x509_1.EXTENSION_OID_SCT; } }));
+Object.defineProperty(exports, "X509Certificate", ({ enumerable: true, get: function () { return x509_1.X509Certificate; } }));
+Object.defineProperty(exports, "X509SCTExtension", ({ enumerable: true, get: function () { return x509_1.X509SCTExtension; } }));
+
+
+/***/ }),
+
+/***/ 9022:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.canonicalize = void 0;
+// JSON canonicalization per https://github.com/cyberphone/json-canonicalization
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function canonicalize(object) {
+    let buffer = '';
+    if (object === null || typeof object !== 'object' || object.toJSON != null) {
+        // Primitives or toJSONable objects
+        buffer += JSON.stringify(object);
+    }
+    else if (Array.isArray(object)) {
+        // Array - maintain element order
+        buffer += '[';
+        let first = true;
+        object.forEach((element) => {
+            if (!first) {
+                buffer += ',';
+            }
+            first = false;
+            // recursive call
+            buffer += canonicalize(element);
+        });
+        buffer += ']';
+    }
+    else {
+        // Object - Sort properties before serializing
+        buffer += '{';
+        let first = true;
+        Object.keys(object)
+            .sort()
+            .forEach((property) => {
+            if (!first) {
+                buffer += ',';
+            }
+            first = false;
+            buffer += JSON.stringify(property);
+            buffer += ':';
+            // recursive call
+            buffer += canonicalize(object[property]);
+        });
+        buffer += '}';
+    }
+    return buffer;
+}
+exports.canonicalize = canonicalize;
+
+
+/***/ }),
+
+/***/ 5960:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SHA2_HASH_ALGOS = exports.ECDSA_SIGNATURE_ALGOS = void 0;
+exports.ECDSA_SIGNATURE_ALGOS = {
+    '1.2.840.10045.4.3.1': 'sha224',
+    '1.2.840.10045.4.3.2': 'sha256',
+    '1.2.840.10045.4.3.3': 'sha384',
+    '1.2.840.10045.4.3.4': 'sha512',
+};
+exports.SHA2_HASH_ALGOS = {
+    '2.16.840.1.101.3.4.2.1': 'sha256',
+    '2.16.840.1.101.3.4.2.2': 'sha384',
+    '2.16.840.1.101.3.4.2.3': 'sha512',
+};
+
+
+/***/ }),
+
+/***/ 5225:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fromDER = exports.toDER = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const PEM_HEADER = /-----BEGIN (.*)-----/;
+const PEM_FOOTER = /-----END (.*)-----/;
+function toDER(certificate) {
+    let der = '';
+    certificate.split('\n').forEach((line) => {
+        if (line.match(PEM_HEADER) || line.match(PEM_FOOTER)) {
+            return;
+        }
+        der += line;
+    });
+    return Buffer.from(der, 'base64');
+}
+exports.toDER = toDER;
+// Translates a DER-encoded buffer into a PEM-encoded string. Standard PEM
+// encoding dictates that each certificate should have a trailing newline after
+// the footer.
+function fromDER(certificate, type = 'CERTIFICATE') {
+    // Base64-encode the certificate.
+    const der = certificate.toString('base64');
+    // Split the certificate into lines of 64 characters.
+    const lines = der.match(/.{1,64}/g) || '';
+    return [`-----BEGIN ${type}-----`, ...lines, `-----END ${type}-----`]
+        .join('\n')
+        .concat('\n');
+}
+exports.fromDER = fromDER;
+
+
+/***/ }),
+
+/***/ 4526:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RFC3161TimestampVerificationError = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+class RFC3161TimestampVerificationError extends Error {
+}
+exports.RFC3161TimestampVerificationError = RFC3161TimestampVerificationError;
+
+
+/***/ }),
+
+/***/ 7411:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RFC3161Timestamp = void 0;
+var timestamp_1 = __nccwpck_require__(9180);
+Object.defineProperty(exports, "RFC3161Timestamp", ({ enumerable: true, get: function () { return timestamp_1.RFC3161Timestamp; } }));
+
+
+/***/ }),
+
+/***/ 9180:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RFC3161Timestamp = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const asn1_1 = __nccwpck_require__(4095);
+const crypto = __importStar(__nccwpck_require__(3914));
+const oid_1 = __nccwpck_require__(5960);
+const error_1 = __nccwpck_require__(4526);
+const tstinfo_1 = __nccwpck_require__(6368);
+const OID_PKCS9_CONTENT_TYPE_SIGNED_DATA = '1.2.840.113549.1.7.2';
+const OID_PKCS9_CONTENT_TYPE_TSTINFO = '1.2.840.113549.1.9.16.1.4';
+const OID_PKCS9_MESSAGE_DIGEST_KEY = '1.2.840.113549.1.9.4';
+class RFC3161Timestamp {
+    constructor(asn1) {
+        this.root = asn1;
+    }
+    static parse(der) {
+        const asn1 = asn1_1.ASN1Obj.parseBuffer(der);
+        return new RFC3161Timestamp(asn1);
+    }
+    get status() {
+        return this.pkiStatusInfoObj.subs[0].toInteger();
+    }
+    get contentType() {
+        return this.contentTypeObj.toOID();
+    }
+    get eContentType() {
+        return this.eContentTypeObj.toOID();
+    }
+    get signingTime() {
+        return this.tstInfo.genTime;
+    }
+    get signerIssuer() {
+        return this.signerSidObj.subs[0].value;
+    }
+    get signerSerialNumber() {
+        return this.signerSidObj.subs[1].value;
+    }
+    get signerDigestAlgorithm() {
+        const oid = this.signerDigestAlgorithmObj.subs[0].toOID();
+        return oid_1.SHA2_HASH_ALGOS[oid];
+    }
+    get signatureAlgorithm() {
+        const oid = this.signatureAlgorithmObj.subs[0].toOID();
+        return oid_1.ECDSA_SIGNATURE_ALGOS[oid];
+    }
+    get signatureValue() {
+        return this.signatureValueObj.value;
+    }
+    get tstInfo() {
+        // Need to unpack tstInfo from an OCTET STRING
+        return new tstinfo_1.TSTInfo(this.eContentObj.subs[0].subs[0]);
+    }
+    verify(data, publicKey) {
+        if (!this.timeStampTokenObj) {
+            throw new error_1.RFC3161TimestampVerificationError('timeStampToken is missing');
+        }
+        // Check for expected ContentInfo content type
+        if (this.contentType !== OID_PKCS9_CONTENT_TYPE_SIGNED_DATA) {
+            throw new error_1.RFC3161TimestampVerificationError(`incorrect content type: ${this.contentType}`);
+        }
+        // Check for expected encapsulated content type
+        if (this.eContentType !== OID_PKCS9_CONTENT_TYPE_TSTINFO) {
+            throw new error_1.RFC3161TimestampVerificationError(`incorrect encapsulated content type: ${this.eContentType}`);
+        }
+        // Check that the tstInfo references the correct artifact
+        this.tstInfo.verify(data);
+        // Check that the signed message digest matches the tstInfo
+        this.verifyMessageDigest();
+        // Check that the signature is valid for the signed attributes
+        this.verifySignature(publicKey);
+    }
+    verifyMessageDigest() {
+        // Check that the tstInfo matches the signed data
+        const tstInfoDigest = crypto.digest(this.signerDigestAlgorithm, this.tstInfo.raw);
+        const expectedDigest = this.messageDigestAttributeObj.subs[1].subs[0].value;
+        if (!crypto.bufferEqual(tstInfoDigest, expectedDigest)) {
+            throw new error_1.RFC3161TimestampVerificationError('signed data does not match tstInfo');
+        }
+    }
+    verifySignature(key) {
+        // Encode the signed attributes for verification
+        const signedAttrs = this.signedAttrsObj.toDER();
+        signedAttrs[0] = 0x31; // Change context-specific tag to SET
+        // Check that the signature is valid for the signed attributes
+        const verified = crypto.verify(signedAttrs, key, this.signatureValue, this.signatureAlgorithm);
+        if (!verified) {
+            throw new error_1.RFC3161TimestampVerificationError('signature verification failed');
+        }
+    }
+    // https://www.rfc-editor.org/rfc/rfc3161#section-2.4.2
+    get pkiStatusInfoObj() {
+        // pkiStatusInfo is the first element of the timestamp response sequence
+        return this.root.subs[0];
+    }
+    // https://www.rfc-editor.org/rfc/rfc3161#section-2.4.2
+    get timeStampTokenObj() {
+        // timeStampToken is the first element of the timestamp response sequence
+        return this.root.subs[1];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-3
+    get contentTypeObj() {
+        return this.timeStampTokenObj.subs[0];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5652#section-3
+    get signedDataObj() {
+        const obj = this.timeStampTokenObj.subs.find((sub) => sub.tag.isContextSpecific(0x00));
+        return obj.subs[0];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.1
+    get encapContentInfoObj() {
+        return this.signedDataObj.subs[2];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.1
+    get signerInfosObj() {
+        // SignerInfos is the last element of the signed data sequence
+        const sd = this.signedDataObj;
+        return sd.subs[sd.subs.length - 1];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5652#section-5.1
+    get signerInfoObj() {
+        // Only supporting one signer
+        return this.signerInfosObj.subs[0];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.2
+    get eContentTypeObj() {
+        return this.encapContentInfoObj.subs[0];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.2
+    get eContentObj() {
+        return this.encapContentInfoObj.subs[1];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get signedAttrsObj() {
+        const signedAttrs = this.signerInfoObj.subs.find((sub) => sub.tag.isContextSpecific(0x00));
+        return signedAttrs;
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get messageDigestAttributeObj() {
+        const messageDigest = this.signedAttrsObj.subs.find((sub) => sub.subs[0].tag.isOID() &&
+            sub.subs[0].toOID() === OID_PKCS9_MESSAGE_DIGEST_KEY);
+        return messageDigest;
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get signerSidObj() {
+        return this.signerInfoObj.subs[1];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get signerDigestAlgorithmObj() {
+        // Signature is the 2nd element of the signerInfoObj object
+        return this.signerInfoObj.subs[2];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get signatureAlgorithmObj() {
+        // Signature is the 4th element of the signerInfoObj object
+        return this.signerInfoObj.subs[4];
+    }
+    // https://datatracker.ietf.org/doc/html/rfc5652#section-5.3
+    get signatureValueObj() {
+        // Signature is the 6th element of the signerInfoObj object
+        return this.signerInfoObj.subs[5];
+    }
+}
+exports.RFC3161Timestamp = RFC3161Timestamp;
+
+
+/***/ }),
+
+/***/ 6368:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TSTInfo = void 0;
+const crypto = __importStar(__nccwpck_require__(3914));
+const oid_1 = __nccwpck_require__(5960);
+const error_1 = __nccwpck_require__(4526);
+class TSTInfo {
+    constructor(asn1) {
+        this.root = asn1;
+    }
+    get version() {
+        return this.root.subs[0].toInteger();
+    }
+    get genTime() {
+        return this.root.subs[4].toDate();
+    }
+    get messageImprintHashAlgorithm() {
+        const oid = this.messageImprintObj.subs[0].subs[0].toOID();
+        return oid_1.SHA2_HASH_ALGOS[oid];
+    }
+    get messageImprintHashedMessage() {
+        return this.messageImprintObj.subs[1].value;
+    }
+    get raw() {
+        return this.root.toDER();
+    }
+    verify(data) {
+        const digest = crypto.digest(this.messageImprintHashAlgorithm, data);
+        if (!crypto.bufferEqual(digest, this.messageImprintHashedMessage)) {
+            throw new error_1.RFC3161TimestampVerificationError('message imprint does not match artifact');
+        }
+    }
+    // https://www.rfc-editor.org/rfc/rfc3161#section-2.4.2
+    get messageImprintObj() {
+        return this.root.subs[2];
+    }
+}
+exports.TSTInfo = TSTInfo;
+
+
+/***/ }),
+
+/***/ 2283:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ByteStream = exports.StreamError = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+class StreamError extends Error {
+}
+exports.StreamError = StreamError;
+class ByteStream {
+    constructor(buffer) {
+        this.start = 0;
+        if (buffer) {
+            this.buf = buffer;
+            this.view = Buffer.from(buffer);
+        }
+        else {
+            this.buf = new ArrayBuffer(0);
+            this.view = Buffer.from(this.buf);
+        }
+    }
+    get buffer() {
+        return this.view.subarray(0, this.start);
+    }
+    get length() {
+        return this.view.byteLength;
+    }
+    get position() {
+        return this.start;
+    }
+    seek(position) {
+        this.start = position;
+    }
+    // Returns a Buffer containing the specified number of bytes starting at the
+    // given start position.
+    slice(start, len) {
+        const end = start + len;
+        if (end > this.length) {
+            throw new StreamError('request past end of buffer');
+        }
+        return this.view.subarray(start, end);
+    }
+    appendChar(char) {
+        this.ensureCapacity(1);
+        this.view[this.start] = char;
+        this.start += 1;
+    }
+    appendUint16(num) {
+        this.ensureCapacity(2);
+        const value = new Uint16Array([num]);
+        const view = new Uint8Array(value.buffer);
+        this.view[this.start] = view[1];
+        this.view[this.start + 1] = view[0];
+        this.start += 2;
+    }
+    appendUint24(num) {
+        this.ensureCapacity(3);
+        const value = new Uint32Array([num]);
+        const view = new Uint8Array(value.buffer);
+        this.view[this.start] = view[2];
+        this.view[this.start + 1] = view[1];
+        this.view[this.start + 2] = view[0];
+        this.start += 3;
+    }
+    appendView(view) {
+        this.ensureCapacity(view.length);
+        this.view.set(view, this.start);
+        this.start += view.length;
+    }
+    getBlock(size) {
+        if (size <= 0) {
+            return Buffer.alloc(0);
+        }
+        if (this.start + size > this.view.length) {
+            throw new Error('request past end of buffer');
+        }
+        const result = this.view.subarray(this.start, this.start + size);
+        this.start += size;
+        return result;
+    }
+    getUint8() {
+        return this.getBlock(1)[0];
+    }
+    getUint16() {
+        const block = this.getBlock(2);
+        return (block[0] << 8) | block[1];
+    }
+    ensureCapacity(size) {
+        if (this.start + size > this.view.byteLength) {
+            const blockSize = ByteStream.BLOCK_SIZE + (size > ByteStream.BLOCK_SIZE ? size : 0);
+            this.realloc(this.view.byteLength + blockSize);
+        }
+    }
+    realloc(size) {
+        const newArray = new ArrayBuffer(size);
+        const newView = Buffer.from(newArray);
+        // Copy the old buffer into the new one
+        newView.set(this.view);
+        this.buf = newArray;
+        this.view = newView;
+    }
+}
+exports.ByteStream = ByteStream;
+ByteStream.BLOCK_SIZE = 1024;
+
+
+/***/ }),
+
+/***/ 6381:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.X509Certificate = exports.EXTENSION_OID_SCT = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const asn1_1 = __nccwpck_require__(4095);
+const crypto = __importStar(__nccwpck_require__(3914));
+const oid_1 = __nccwpck_require__(5960);
+const pem = __importStar(__nccwpck_require__(5225));
+const ext_1 = __nccwpck_require__(1292);
+const EXTENSION_OID_SUBJECT_KEY_ID = '2.5.29.14';
+const EXTENSION_OID_KEY_USAGE = '2.5.29.15';
+const EXTENSION_OID_SUBJECT_ALT_NAME = '2.5.29.17';
+const EXTENSION_OID_BASIC_CONSTRAINTS = '2.5.29.19';
+const EXTENSION_OID_AUTHORITY_KEY_ID = '2.5.29.35';
+exports.EXTENSION_OID_SCT = '1.3.6.1.4.1.11129.2.4.2';
+class X509Certificate {
+    constructor(asn1) {
+        this.root = asn1;
+    }
+    static parse(cert) {
+        const der = typeof cert === 'string' ? pem.toDER(cert) : cert;
+        const asn1 = asn1_1.ASN1Obj.parseBuffer(der);
+        return new X509Certificate(asn1);
+    }
+    get tbsCertificate() {
+        return this.tbsCertificateObj;
+    }
+    get version() {
+        // version number is the first element of the version context specific tag
+        const ver = this.versionObj.subs[0].toInteger();
+        return `v${(ver + BigInt(1)).toString()}`;
+    }
+    get serialNumber() {
+        return this.serialNumberObj.value;
+    }
+    get notBefore() {
+        // notBefore is the first element of the validity sequence
+        return this.validityObj.subs[0].toDate();
+    }
+    get notAfter() {
+        // notAfter is the second element of the validity sequence
+        return this.validityObj.subs[1].toDate();
+    }
+    get issuer() {
+        return this.issuerObj.value;
+    }
+    get subject() {
+        return this.subjectObj.value;
+    }
+    get publicKey() {
+        return this.subjectPublicKeyInfoObj.toDER();
+    }
+    get signatureAlgorithm() {
+        const oid = this.signatureAlgorithmObj.subs[0].toOID();
+        return oid_1.ECDSA_SIGNATURE_ALGOS[oid];
+    }
+    get signatureValue() {
+        // Signature value is a bit string, so we need to skip the first byte
+        return this.signatureValueObj.value.subarray(1);
+    }
+    get subjectAltName() {
+        const ext = this.extSubjectAltName;
+        return ext?.uri || ext?.rfc822Name;
+    }
+    get extensions() {
+        // The extension list is the first (and only) element of the extensions
+        // context specific tag
+        const extSeq = this.extensionsObj?.subs[0];
+        return extSeq?.subs || /* istanbul ignore next */ [];
+    }
+    get extKeyUsage() {
+        const ext = this.findExtension(EXTENSION_OID_KEY_USAGE);
+        return ext ? new ext_1.X509KeyUsageExtension(ext) : undefined;
+    }
+    get extBasicConstraints() {
+        const ext = this.findExtension(EXTENSION_OID_BASIC_CONSTRAINTS);
+        return ext ? new ext_1.X509BasicConstraintsExtension(ext) : undefined;
+    }
+    get extSubjectAltName() {
+        const ext = this.findExtension(EXTENSION_OID_SUBJECT_ALT_NAME);
+        return ext ? new ext_1.X509SubjectAlternativeNameExtension(ext) : undefined;
+    }
+    get extAuthorityKeyID() {
+        const ext = this.findExtension(EXTENSION_OID_AUTHORITY_KEY_ID);
+        return ext ? new ext_1.X509AuthorityKeyIDExtension(ext) : undefined;
+    }
+    get extSubjectKeyID() {
+        const ext = this.findExtension(EXTENSION_OID_SUBJECT_KEY_ID);
+        return ext
+            ? new ext_1.X509SubjectKeyIDExtension(ext)
+            : /* istanbul ignore next */ undefined;
+    }
+    get extSCT() {
+        const ext = this.findExtension(exports.EXTENSION_OID_SCT);
+        return ext ? new ext_1.X509SCTExtension(ext) : undefined;
+    }
+    get isCA() {
+        const ca = this.extBasicConstraints?.isCA || false;
+        // If the KeyUsage extension is present, keyCertSign must be set
+        if (this.extKeyUsage) {
+            ca && this.extKeyUsage.keyCertSign;
+        }
+        return ca;
+    }
+    extension(oid) {
+        const ext = this.findExtension(oid);
+        return ext ? new ext_1.X509Extension(ext) : undefined;
+    }
+    verify(issuerCertificate) {
+        // Use the issuer's public key if provided, otherwise use the subject's
+        const publicKey = issuerCertificate?.publicKey || this.publicKey;
+        const key = crypto.createPublicKey(publicKey);
+        return crypto.verify(this.tbsCertificate.toDER(), key, this.signatureValue, this.signatureAlgorithm);
+    }
+    validForDate(date) {
+        return this.notBefore <= date && date <= this.notAfter;
+    }
+    equals(other) {
+        return this.root.toDER().equals(other.root.toDER());
+    }
+    // Creates a copy of the certificate with a new buffer
+    clone() {
+        const der = this.root.toDER();
+        const clone = Buffer.alloc(der.length);
+        der.copy(clone);
+        return X509Certificate.parse(clone);
+    }
+    findExtension(oid) {
+        // Find the extension with the given OID. The OID will always be the first
+        // element of the extension sequence
+        return this.extensions.find((ext) => ext.subs[0].toOID() === oid);
+    }
+    /////////////////////////////////////////////////////////////////////////////
+    // The following properties use the documented x509 structure to locate the
+    // desired ASN.1 object
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.1
+    get tbsCertificateObj() {
+        // tbsCertificate is the first element of the certificate sequence
+        return this.root.subs[0];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.2
+    get signatureAlgorithmObj() {
+        // signatureAlgorithm is the second element of the certificate sequence
+        return this.root.subs[1];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.3
+    get signatureValueObj() {
+        // signatureValue is the third element of the certificate sequence
+        return this.root.subs[2];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.1
+    get versionObj() {
+        // version is the first element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[0];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2
+    get serialNumberObj() {
+        // serialNumber is the second element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[1];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.4
+    get issuerObj() {
+        // issuer is the fourth element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[3];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.5
+    get validityObj() {
+        // version is the fifth element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[4];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.6
+    get subjectObj() {
+        // subject is the sixth element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[5];
+    }
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.7
+    get subjectPublicKeyInfoObj() {
+        // subjectPublicKeyInfo is the seventh element of the tbsCertificate sequence
+        return this.tbsCertificateObj.subs[6];
+    }
+    // Extensions can't be located by index because their position varies. Instead,
+    // we need to find the extensions context specific tag
+    // https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.9
+    get extensionsObj() {
+        return this.tbsCertificateObj.subs.find((sub) => sub.tag.isContextSpecific(0x03));
+    }
+}
+exports.X509Certificate = X509Certificate;
+
+
+/***/ }),
+
+/***/ 1292:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.X509SCTExtension = exports.X509SubjectKeyIDExtension = exports.X509AuthorityKeyIDExtension = exports.X509SubjectAlternativeNameExtension = exports.X509KeyUsageExtension = exports.X509BasicConstraintsExtension = exports.X509Extension = void 0;
+const stream_1 = __nccwpck_require__(2283);
+const sct_1 = __nccwpck_require__(454);
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.1
+class X509Extension {
+    constructor(asn1) {
+        this.root = asn1;
+    }
+    get oid() {
+        return this.root.subs[0].toOID();
+    }
+    get critical() {
+        // The critical field is optional and will be the second element of the
+        // extension sequence if present. Default to false if not present.
+        return this.root.subs.length === 3 ? this.root.subs[1].toBoolean() : false;
+    }
+    get value() {
+        return this.extnValueObj.value;
+    }
+    get valueObj() {
+        return this.extnValueObj;
+    }
+    get extnValueObj() {
+        // The extnValue field will be the last element of the extension sequence
+        return this.root.subs[this.root.subs.length - 1];
+    }
+}
+exports.X509Extension = X509Extension;
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9
+class X509BasicConstraintsExtension extends X509Extension {
+    get isCA() {
+        return this.sequence.subs[0]?.toBoolean() ?? false;
+    }
+    get pathLenConstraint() {
+        return this.sequence.subs.length > 1
+            ? this.sequence.subs[1].toInteger()
+            : undefined;
+    }
+    // The extnValue field contains a single sequence wrapping the isCA and
+    // pathLenConstraint.
+    get sequence() {
+        return this.extnValueObj.subs[0];
+    }
+}
+exports.X509BasicConstraintsExtension = X509BasicConstraintsExtension;
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.3
+class X509KeyUsageExtension extends X509Extension {
+    get digitalSignature() {
+        return this.bitString[0] === 1;
+    }
+    get keyCertSign() {
+        return this.bitString[5] === 1;
+    }
+    get crlSign() {
+        return this.bitString[6] === 1;
+    }
+    // The extnValue field contains a single bit string which is a bit mask
+    // indicating which key usages are enabled.
+    get bitString() {
+        return this.extnValueObj.subs[0].toBitString();
+    }
+}
+exports.X509KeyUsageExtension = X509KeyUsageExtension;
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.6
+class X509SubjectAlternativeNameExtension extends X509Extension {
+    get rfc822Name() {
+        return this.findGeneralName(0x01)?.value.toString('ascii');
+    }
+    get uri() {
+        return this.findGeneralName(0x06)?.value.toString('ascii');
+    }
+    // Retrieve the value of an otherName with the given OID.
+    otherName(oid) {
+        const otherName = this.findGeneralName(0x00);
+        if (otherName === undefined) {
+            return undefined;
+        }
+        // The otherName is a sequence containing an OID and a value.
+        // Need to check that the OID matches the one we're looking for.
+        const otherNameOID = otherName.subs[0].toOID();
+        if (otherNameOID !== oid) {
+            return undefined;
+        }
+        // The otherNameValue is a sequence containing the actual value.
+        const otherNameValue = otherName.subs[1];
+        return otherNameValue.subs[0].value.toString('ascii');
+    }
+    findGeneralName(tag) {
+        return this.generalNames.find((gn) => gn.tag.isContextSpecific(tag));
+    }
+    // The extnValue field contains a sequence of GeneralNames.
+    get generalNames() {
+        return this.extnValueObj.subs[0].subs;
+    }
+}
+exports.X509SubjectAlternativeNameExtension = X509SubjectAlternativeNameExtension;
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.1
+class X509AuthorityKeyIDExtension extends X509Extension {
+    get keyIdentifier() {
+        return this.findSequenceMember(0x00)?.value;
+    }
+    findSequenceMember(tag) {
+        return this.sequence.subs.find((el) => el.tag.isContextSpecific(tag));
+    }
+    // The extnValue field contains a single sequence wrapping the keyIdentifier
+    get sequence() {
+        return this.extnValueObj.subs[0];
+    }
+}
+exports.X509AuthorityKeyIDExtension = X509AuthorityKeyIDExtension;
+// https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.2
+class X509SubjectKeyIDExtension extends X509Extension {
+    get keyIdentifier() {
+        return this.extnValueObj.subs[0].value;
+    }
+}
+exports.X509SubjectKeyIDExtension = X509SubjectKeyIDExtension;
+// https://www.rfc-editor.org/rfc/rfc6962#section-3.3
+class X509SCTExtension extends X509Extension {
+    constructor(asn1) {
+        super(asn1);
+    }
+    get signedCertificateTimestamps() {
+        const buf = this.extnValueObj.subs[0].value;
+        const stream = new stream_1.ByteStream(buf);
+        // The overall list length is encoded in the first two bytes -- note this
+        // is the length of the list in bytes, NOT the number of SCTs in the list
+        const end = stream.getUint16() + 2;
+        const sctList = [];
+        while (stream.position < end) {
+            // Read the length of the next SCT
+            const sctLength = stream.getUint16();
+            // Slice out the bytes for the next SCT and parse it
+            const sct = stream.getBlock(sctLength);
+            sctList.push(sct_1.SignedCertificateTimestamp.parse(sct));
+        }
+        if (stream.position !== end) {
+            throw new Error('SCT list length does not match actual length');
+        }
+        return sctList;
+    }
+}
+exports.X509SCTExtension = X509SCTExtension;
+
+
+/***/ }),
+
+/***/ 5500:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.X509SCTExtension = exports.X509Certificate = exports.EXTENSION_OID_SCT = void 0;
+var cert_1 = __nccwpck_require__(6381);
+Object.defineProperty(exports, "EXTENSION_OID_SCT", ({ enumerable: true, get: function () { return cert_1.EXTENSION_OID_SCT; } }));
+Object.defineProperty(exports, "X509Certificate", ({ enumerable: true, get: function () { return cert_1.X509Certificate; } }));
+var ext_1 = __nccwpck_require__(1292);
+Object.defineProperty(exports, "X509SCTExtension", ({ enumerable: true, get: function () { return ext_1.X509SCTExtension; } }));
+
+
+/***/ }),
+
+/***/ 454:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SignedCertificateTimestamp = void 0;
+/*
+Copyright 2023 The Sigstore Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+const crypto = __importStar(__nccwpck_require__(3914));
+const stream_1 = __nccwpck_require__(2283);
+class SignedCertificateTimestamp {
+    constructor(options) {
+        this.version = options.version;
+        this.logID = options.logID;
+        this.timestamp = options.timestamp;
+        this.extensions = options.extensions;
+        this.hashAlgorithm = options.hashAlgorithm;
+        this.signatureAlgorithm = options.signatureAlgorithm;
+        this.signature = options.signature;
+    }
+    get datetime() {
+        return new Date(Number(this.timestamp.readBigInt64BE()));
+    }
+    // Returns the hash algorithm used to generate the SCT's signature.
+    // https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.4.1
+    get algorithm() {
+        switch (this.hashAlgorithm) {
+            /* istanbul ignore next */
+            case 0:
+                return 'none';
+            /* istanbul ignore next */
+            case 1:
+                return 'md5';
+            /* istanbul ignore next */
+            case 2:
+                return 'sha1';
+            /* istanbul ignore next */
+            case 3:
+                return 'sha224';
+            case 4:
+                return 'sha256';
+            /* istanbul ignore next */
+            case 5:
+                return 'sha384';
+            /* istanbul ignore next */
+            case 6:
+                return 'sha512';
+            /* istanbul ignore next */
+            default:
+                return 'unknown';
+        }
+    }
+    verify(preCert, key) {
+        // Assemble the digitally-signed struct (the data over which the signature
+        // was generated).
+        // https://www.rfc-editor.org/rfc/rfc6962#section-3.2
+        const stream = new stream_1.ByteStream();
+        stream.appendChar(this.version);
+        stream.appendChar(0x00); // SignatureType = certificate_timestamp(0)
+        stream.appendView(this.timestamp);
+        stream.appendUint16(0x01); // LogEntryType = precert_entry(1)
+        stream.appendView(preCert);
+        stream.appendUint16(this.extensions.byteLength);
+        /* istanbul ignore next - extensions are very uncommon */
+        if (this.extensions.byteLength > 0) {
+            stream.appendView(this.extensions);
+        }
+        return crypto.verify(stream.buffer, key, this.signature, this.algorithm);
+    }
+    // Parses a SignedCertificateTimestamp from a buffer. SCTs are encoded using
+    // TLS encoding which means the fields and lengths of most fields are
+    // specified as part of the SCT and TLS specs.
+    // https://www.rfc-editor.org/rfc/rfc6962#section-3.2
+    // https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.4.1
+    static parse(buf) {
+        const stream = new stream_1.ByteStream(buf);
+        // Version - enum { v1(0), (255) }
+        const version = stream.getUint8();
+        // Log ID  - struct { opaque key_id[32]; }
+        const logID = stream.getBlock(32);
+        // Timestamp - uint64
+        const timestamp = stream.getBlock(8);
+        // Extensions - opaque extensions<0..2^16-1>;
+        const extenstionLength = stream.getUint16();
+        const extensions = stream.getBlock(extenstionLength);
+        // Hash algo - enum { sha256(4), . . . (255) }
+        const hashAlgorithm = stream.getUint8();
+        // Signature algo - enum { anonymous(0), rsa(1), dsa(2), ecdsa(3), (255) }
+        const signatureAlgorithm = stream.getUint8();
+        // Signature  - opaque signature<0..2^16-1>;
+        const sigLength = stream.getUint16();
+        const signature = stream.getBlock(sigLength);
+        // Check that we read the entire buffer
+        if (stream.position !== buf.length) {
+            throw new Error('SCT buffer length mismatch');
+        }
+        return new SignedCertificateTimestamp({
+            version,
+            logID,
+            timestamp,
+            extensions,
+            hashAlgorithm,
+            signatureAlgorithm,
+            signature,
+        });
+    }
+}
+exports.SignedCertificateTimestamp = SignedCertificateTimestamp;
 
 
 /***/ }),
@@ -12298,110 +14210,6 @@ Object.defineProperty(exports, "FulcioSigner", ({ enumerable: true, get: functio
 
 /***/ }),
 
-/***/ 5657:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.hash = void 0;
-/*
-Copyright 2023 The Sigstore Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-const crypto_1 = __importDefault(__nccwpck_require__(6113));
-const SHA256_ALGORITHM = 'sha256';
-function hash(data, algorithm = SHA256_ALGORITHM) {
-    return crypto_1.default.createHash(algorithm).update(data).digest();
-}
-exports.hash = hash;
-
-
-/***/ }),
-
-/***/ 8502:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.preAuthEncoding = void 0;
-/*
-Copyright 2023 The Sigstore Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-const PAE_PREFIX = 'DSSEv1';
-// DSSE Pre-Authentication Encoding
-function preAuthEncoding(payloadType, payload) {
-    const prefix = Buffer.from(`${PAE_PREFIX} ${payloadType.length} ${payloadType} ${payload.length} `, 'ascii');
-    return Buffer.concat([prefix, payload]);
-}
-exports.preAuthEncoding = preAuthEncoding;
-
-
-/***/ }),
-
-/***/ 970:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.base64Decode = exports.base64Encode = void 0;
-/*
-Copyright 2023 The Sigstore Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-const BASE64_ENCODING = 'base64';
-const UTF8_ENCODING = 'utf-8';
-function base64Encode(str) {
-    return Buffer.from(str, UTF8_ENCODING).toString(BASE64_ENCODING);
-}
-exports.base64Encode = base64Encode;
-function base64Decode(str) {
-    return Buffer.from(str, BASE64_ENCODING).toString(UTF8_ENCODING);
-}
-exports.base64Decode = base64Decode;
-
-
-/***/ }),
-
 /***/ 724:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -12431,7 +14239,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ua = exports.pem = exports.oidc = exports.json = exports.encoding = exports.dsse = exports.crypto = void 0;
+exports.ua = exports.oidc = exports.pem = exports.json = exports.encoding = exports.dsse = exports.crypto = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -12447,114 +14255,23 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-exports.crypto = __importStar(__nccwpck_require__(5657));
-exports.dsse = __importStar(__nccwpck_require__(8502));
-exports.encoding = __importStar(__nccwpck_require__(970));
-exports.json = __importStar(__nccwpck_require__(3741));
+var core_1 = __nccwpck_require__(3352);
+Object.defineProperty(exports, "crypto", ({ enumerable: true, get: function () { return core_1.crypto; } }));
+Object.defineProperty(exports, "dsse", ({ enumerable: true, get: function () { return core_1.dsse; } }));
+Object.defineProperty(exports, "encoding", ({ enumerable: true, get: function () { return core_1.encoding; } }));
+Object.defineProperty(exports, "json", ({ enumerable: true, get: function () { return core_1.json; } }));
+Object.defineProperty(exports, "pem", ({ enumerable: true, get: function () { return core_1.pem; } }));
 exports.oidc = __importStar(__nccwpck_require__(3397));
-exports.pem = __importStar(__nccwpck_require__(1483));
 exports.ua = __importStar(__nccwpck_require__(6253));
 
 
 /***/ }),
 
-/***/ 3741:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.canonicalize = void 0;
-/*
-Copyright 2023 The Sigstore Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-// JSON canonicalization per https://github.com/cyberphone/json-canonicalization
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function canonicalize(object) {
-    let buffer = '';
-    if (object === null || typeof object !== 'object' || object.toJSON != null) {
-        // Primitives or toJSONable objects
-        buffer += JSON.stringify(object);
-    }
-    else if (Array.isArray(object)) {
-        // Array - maintain element order
-        buffer += '[';
-        let first = true;
-        object.forEach((element) => {
-            if (!first) {
-                buffer += ',';
-            }
-            first = false;
-            // recursive call
-            buffer += canonicalize(element);
-        });
-        buffer += ']';
-    }
-    else {
-        // Object - Sort properties before serializing
-        buffer += '{';
-        let first = true;
-        Object.keys(object)
-            .sort()
-            .forEach((property) => {
-            if (!first) {
-                buffer += ',';
-            }
-            first = false;
-            buffer += JSON.stringify(property);
-            buffer += ':';
-            // recursive call
-            buffer += canonicalize(object[property]);
-        });
-        buffer += '}';
-    }
-    return buffer;
-}
-exports.canonicalize = canonicalize;
-
-
-/***/ }),
-
 /***/ 3397:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.extractJWTSubject = void 0;
 /*
@@ -12572,10 +14289,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-const enc = __importStar(__nccwpck_require__(970));
+const core_1 = __nccwpck_require__(3352);
 function extractJWTSubject(jwt) {
     const parts = jwt.split('.', 3);
-    const payload = JSON.parse(enc.base64Decode(parts[1]));
+    const payload = JSON.parse(core_1.encoding.base64Decode(parts[1]));
     switch (payload.iss) {
         case 'https://accounts.google.com':
         case 'https://oauth2.sigstore.dev/auth':
@@ -12585,41 +14302,6 @@ function extractJWTSubject(jwt) {
     }
 }
 exports.extractJWTSubject = extractJWTSubject;
-
-
-/***/ }),
-
-/***/ 1483:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.toDER = void 0;
-/*
-Copyright 2023 The Sigstore Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-const PEM_HEADER = /-----BEGIN (.*)-----/;
-const PEM_FOOTER = /-----END (.*)-----/;
-function toDER(certificate) {
-    const lines = certificate
-        .split('\n')
-        .map((line) => line.match(PEM_HEADER) || line.match(PEM_FOOTER) ? '' : line);
-    return Buffer.from(lines.join(''), 'base64');
-}
-exports.toDER = toDER;
 
 
 /***/ }),
@@ -72248,7 +73930,7 @@ exports.LRUCache = LRUCache;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"2.2.0"};
+module.exports = {"i8":"2.2.1"};
 
 /***/ }),
 
