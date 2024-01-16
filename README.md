@@ -177,7 +177,7 @@ jobs:
       - name: Build artifact
         run: make some-app
       - name: Attest artifact
-      - uses: github-early-access/generate-build-provenance@main
+        uses: github-early-access/generate-build-provenance@main
         with:
           subject-path: '${{ github.workspace }}/some-app'
 ```
@@ -214,7 +214,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Attest artifact
-      - uses: github-early-access/generate-build-provenance@main
+        uses: github-early-access/generate-build-provenance@main
         with:
           subject-path: 'dist/**/my-bin-*'
 ```
