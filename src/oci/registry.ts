@@ -170,7 +170,12 @@ export class RegistryClient {
   async checkManifest(reference: string): Promise<CheckManifestResponse> {
     const response = await this.#fetch(
       `${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`,
-      { method: 'HEAD' }
+      {
+        method: 'HEAD',
+        headers: {
+          [HEADER_ACCEPT]: `${CONTENT_TYPE_OCI_MANIFEST},${CONTENT_TYPE_OCI_INDEX}`
+        }
+      }
     ).then(ensureStatus(200))
 
     const mediaType =

@@ -62707,7 +62707,12 @@ class RegistryClient {
     }
     // Checks for the existence of a manifest by reference
     async checkManifest(reference) {
-        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, { method: 'HEAD' }).then((0, error_1.ensureStatus)(200));
+        const response = await this.#fetch(`${this.#baseURL}/v2/${this.#repository}/manifests/${reference}`, {
+            method: 'HEAD',
+            headers: {
+                [constants_1.HEADER_ACCEPT]: `${constants_1.CONTENT_TYPE_OCI_MANIFEST},${constants_1.CONTENT_TYPE_OCI_INDEX}`
+            }
+        }).then((0, error_1.ensureStatus)(200));
         const mediaType = response.headers.get(constants_1.HEADER_CONTENT_TYPE) || /* istanbul ignore next */ '';
         const digest = response.headers.get(constants_1.HEADER_DIGEST) || /* istanbul ignore next */ '';
         const size = Number(response.headers.get(constants_1.HEADER_CONTENT_LENGTH)) ||
