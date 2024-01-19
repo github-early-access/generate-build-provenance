@@ -279,8 +279,11 @@ jobs:
           push-to-registry: true
 ```
 
-> **NOTE**: At this time, publishing attestations to AWS Elastic Container
-> Registry (ECR) is NOT supported.
+# Known issues
+1. At this time, publishing attestations to AWS Elastic Container
+   Registry (ECR) is NOT supported.
+1. Using the `docker/setup-buildx-action` prior to generating the
+   provenance causes upload of provenance to fail.
 
 [1]: https://www.sigstore.dev/
 [2]: https://slsa.dev/spec/v1.0/provenance
