@@ -25,13 +25,24 @@ export async function run(): Promise<void> {
       : 'private'
   core.debug(`Provenance attestation visibility: ${visibility}`)
 
+  const sbomPath = core.getInput('sbom')
+  if (sbomPath) {
+    // Read SBOM from file
+  }
+  const sbom = JSON.parse('{}')
+
   try {
     // Calculate subject from inputs and generate provenance
     const subjects = await subjectFromInputs()
 
     // Generate attestations for each subject serially
     const attestations = await Promise.all(
-      subjects.map(async subject => await attest(subject, visibility))
+      subjects.map(async subject => {
+        if (sbom) {
+          await attestSBOM(subject, sbom, visibility)
+        }
+        return await attestProvenance(subject, visibility)
+      })
     )
 
     // Set bundle as action output, but ONLY IF there is a single attestation
@@ -52,7 +63,7 @@ export async function run(): Promise<void> {
   }
 }
 
-const attest = async (
+const attestProvenance = async (
   subject: Subject,
   visibility: Visibility
 ): Promise<Attestation> => {
@@ -66,8 +77,27 @@ const attest = async (
   core.info(JSON.stringify(provenance, null, 2))
   core.endGroup()
 
+  return await attest(subject, provenance, visibility)
+}
+
+const attestSBOM = async (
+  subject: Subject,
+  sbom: object,
+  visibility: Visibility
+): Promise<Attestation> => {
+  // Package the SBOM in an into statement
+  const statement = {}
+
+  return await attest(subject, statement, visibility)
+}
+
+const attest = async (
+  subject: Subject,
+  statement: object,
+  visibility: Visibility
+): Promise<Attestation> => {
   // Sign provenance w/ Sigstore
-  const attestation = await signStatement(provenance, visibility)
+  const attestation = await signStatement(statement, visibility)
 
   core.startGroup(highlight('Attestation signed using ephemeral certificate'))
   core.info(attestation.certificate)
