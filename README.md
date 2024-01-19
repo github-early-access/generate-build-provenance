@@ -280,6 +280,7 @@ jobs:
 ```
 
 # Known issues
+
 1. At this time, publishing attestations to AWS Elastic Container
    Registry (ECR) is NOT supported.
 1. Using the `docker/setup-buildx-action` prior to generating the
