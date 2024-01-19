@@ -279,7 +279,7 @@ jobs:
           push-to-registry: true
 ```
 
-# Known issues
+## Known issues
 
 1. At this time, publishing attestations to AWS Elastic Container
    Registry (ECR) is NOT supported.
