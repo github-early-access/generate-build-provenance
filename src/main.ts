@@ -3,6 +3,7 @@ import * as github from '@actions/github'
 import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
 import { attachArtifactToImage } from './oci'
 import { generateProvenance, SLSA_PREDICATE_V1_TYPE } from './provenance'
+import { generateSBOMStatement, parseSBOMFromPath, Sbom } from './sbom'
 import { Attestation, signStatement, Visibility } from './sign'
 import { writeAttestation } from './store'
 import { DIGEST_ALGORITHM, Subject, subjectFromInputs } from './subject'
@@ -26,10 +27,12 @@ export async function run(): Promise<void> {
   core.debug(`Provenance attestation visibility: ${visibility}`)
 
   const sbomPath = core.getInput('sbom')
+  var sbom: Sbom | undefined
   if (sbomPath) {
     // Read SBOM from file
+    core.debug(`Reading SBOM from ${sbomPath}`)
+    sbom = await parseSBOMFromPath(sbomPath)
   }
-  const sbom = JSON.parse('{}')
 
   try {
     // Calculate subject from inputs and generate provenance
@@ -82,11 +85,11 @@ const attestProvenance = async (
 
 const attestSBOM = async (
   subject: Subject,
-  sbom: object,
+  sbom: Sbom,
   visibility: Visibility
 ): Promise<Attestation> => {
   // Package the SBOM in an into statement
-  const statement = {}
+  const statement = generateSBOMStatement(subject, sbom)
 
   return await attest(subject, statement, visibility)
 }
