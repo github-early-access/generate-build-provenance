@@ -27,7 +27,7 @@ export async function run(): Promise<void> {
   core.debug(`Provenance attestation visibility: ${visibility}`)
 
   const sbomPath = core.getInput('sbom')
-  var sbom: Sbom | undefined
+  let sbom: Sbom | undefined
   if (sbomPath) {
     // Read SBOM from file
     core.debug(`Reading SBOM from ${sbomPath}`)

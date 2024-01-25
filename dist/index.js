@@ -62205,6 +62205,7 @@ const github = __importStar(__nccwpck_require__(5438));
 const bundle_1 = __nccwpck_require__(9715);
 const oci_1 = __nccwpck_require__(1871);
 const provenance_1 = __nccwpck_require__(38);
+const sbom_1 = __nccwpck_require__(6210);
 const sign_1 = __nccwpck_require__(6110);
 const store_1 = __nccwpck_require__(9425);
 const subject_1 = __nccwpck_require__(5206);
@@ -62223,11 +62224,23 @@ async function run() {
         ? 'public'
         : 'private';
     core.debug(`Provenance attestation visibility: ${visibility}`);
+    const sbomPath = core.getInput('sbom');
+    let sbom;
+    if (sbomPath) {
+        // Read SBOM from file
+        core.debug(`Reading SBOM from ${sbomPath}`);
+        sbom = await (0, sbom_1.parseSBOMFromPath)(sbomPath);
+    }
     try {
         // Calculate subject from inputs and generate provenance
         const subjects = await (0, subject_1.subjectFromInputs)();
         // Generate attestations for each subject serially
-        const attestations = await Promise.all(subjects.map(async (subject) => await attest(subject, visibility)));
+        const attestations = await Promise.all(subjects.map(async (subject) => {
+            if (sbom) {
+                await attestSBOM(subject, sbom, visibility);
+            }
+            return await attestProvenance(subject, visibility);
+        }));
         // Set bundle as action output, but ONLY IF there is a single attestation
         if (attestations.length === 1) {
             core.setOutput('bundle', attestations[0].bundle);
@@ -62244,13 +62257,21 @@ async function run() {
     }
 }
 exports.run = run;
-const attest = async (subject, visibility) => {
+const attestProvenance = async (subject, visibility) => {
     const provenance = (0, provenance_1.generateProvenance)(subject, process.env);
     core.startGroup(highlight(`Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`));
     core.info(JSON.stringify(provenance, null, 2));
     core.endGroup();
+    return await attest(subject, provenance, visibility);
+};
+const attestSBOM = async (subject, sbom, visibility) => {
+    // Package the SBOM in an into statement
+    const statement = (0, sbom_1.generateSBOMStatement)(subject, sbom);
+    return await attest(subject, statement, visibility);
+};
+const attest = async (subject, statement, visibility) => {
     // Sign provenance w/ Sigstore
-    const attestation = await (0, sign_1.signStatement)(provenance, visibility);
+    const attestation = await (0, sign_1.signStatement)(statement, visibility);
     core.startGroup(highlight('Attestation signed using ephemeral certificate'));
     core.info(attestation.certificate);
     core.endGroup();
@@ -62868,6 +62889,77 @@ const generateProvenance = (subject, env) => {
     };
 };
 exports.generateProvenance = generateProvenance;
+
+
+/***/ }),
+
+/***/ 6210:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.generateCycloneDXIntoto = exports.generateSPDXIntoto = exports.generateSBOMStatement = exports.parseSBOMFromPath = void 0;
+const fs_1 = __importDefault(__nccwpck_require__(7147));
+async function parseSBOMFromPath(path) {
+    // Read the file content
+    const fileContent = await fs_1.default.promises.readFile(path, 'utf8');
+    const sbom = JSON.parse(fileContent);
+    if (checkIsSPDX(sbom)) {
+        return { type: 'spdx', object: sbom };
+    }
+    else if (checkIsCycloneDX(sbom)) {
+        return { type: 'cyclonedx', object: sbom };
+    }
+    throw new Error('Unsupported SBOM format');
+}
+exports.parseSBOMFromPath = parseSBOMFromPath;
+function checkIsSPDX(sbomObject) {
+    if (sbomObject?.spdxVersion && sbomObject?.SPDXID) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+function checkIsCycloneDX(sbomObject) {
+    if (sbomObject?.bomFormat &&
+        sbomObject?.serialNumber &&
+        sbomObject?.specVersion) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+const generateSBOMStatement = (subject, sbom) => {
+    if (sbom.type === 'spdx') {
+        return (0, exports.generateSPDXIntoto)(subject, sbom.object);
+    }
+    throw new Error('Unsupported SBOM format');
+};
+exports.generateSBOMStatement = generateSBOMStatement;
+const generateSPDXIntoto = (subject, sbom) => {
+    return {
+        _type: 'https://in-toto.io/Statement/v0.1',
+        subject: [subject],
+        predicateType: 'https://spdx.dev/Document/v2.3',
+        predicate: sbom
+    };
+};
+exports.generateSPDXIntoto = generateSPDXIntoto;
+const generateCycloneDXIntoto = (subject, sbom) => {
+    return {
+        _type: 'https://in-toto.io/Statement/v0.1',
+        subject: [subject],
+        predicateType: 'https://cyclonedx.org/bom/v1.4',
+        predicate: sbom
+    };
+};
+exports.generateCycloneDXIntoto = generateCycloneDXIntoto;
 
 
 /***/ }),

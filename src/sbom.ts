@@ -7,37 +7,39 @@ export type Sbom = {
 }
 
 export async function parseSBOMFromPath(path: string): Promise<Sbom> {
-  try {
-    // Read the file content
-    const fileContent = await fs.promises.readFile(path, 'utf8')
+  // Read the file content
+  const fileContent = await fs.promises.readFile(path, 'utf8')
 
-    const sbom = JSON.parse(fileContent)
+  const sbom = JSON.parse(fileContent)
 
-    if (checkIsSPDX(sbom)) {
-      return { type: 'spdx', object: sbom }
-    } else if (checkIsCycloneDX(sbom)) {
-      return { type: 'cyclonedx', object: sbom }
-    } else {
-      throw new Error('Unsupported SBOM format')
-    }
-  } catch (error) {
-    throw error
+  if (checkIsSPDX(sbom)) {
+    return { type: 'spdx', object: sbom }
+  } else if (checkIsCycloneDX(sbom)) {
+    return { type: 'cyclonedx', object: sbom }
   }
+  throw new Error('Unsupported SBOM format')
 }
 
-function checkIsSPDX(sbomObject: any): boolean {
-  if (sbomObject.spdxVersion && sbomObject.SPDXID) {
+function checkIsSPDX(sbomObject: {
+  spdxVersion?: string
+  SPDXID?: string
+}): boolean {
+  if (sbomObject?.spdxVersion && sbomObject?.SPDXID) {
     return true
   } else {
     return false
   }
 }
 
-function checkIsCycloneDX(sbomObject: any): boolean {
+function checkIsCycloneDX(sbomObject: {
+  bomFormat?: string
+  serialNumber?: string
+  specVersion?: string
+}): boolean {
   if (
-    sbomObject.bomFormat &&
-    sbomObject.serialNumber &&
-    sbomObject.specVersion
+    sbomObject?.bomFormat &&
+    sbomObject?.serialNumber &&
+    sbomObject?.specVersion
   ) {
     return true
   } else {
