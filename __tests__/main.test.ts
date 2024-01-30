@@ -20,6 +20,7 @@ import {
 import * as main from '../src/main'
 import * as oci from '../src/oci'
 import { CONTENT_TYPE_OCI_MANIFEST } from '../src/oci/constants'
+import path from 'path'
 
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug')
@@ -275,6 +276,68 @@ describe('action', () => {
         'bundle',
         expect.anything()
       )
+    })
+  })
+
+  describe('when sbom is set', () => {
+    const ociSpy = jest.spyOn(oci, 'attachArtifactToImage')
+
+    const artifactDigest = 'sha256:1234567890'
+    const artifactSize = 123
+
+    const sbomPath = path.join(__dirname, './data/spdx.json')
+    const inputs = {
+      'subject-digest':
+        'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+      'subject-name': 'subject',
+      'github-token': 'gh-token',
+      'sbom': sbomPath
+    }
+
+    beforeEach(async () => {
+      // Set the GH context with private repository visibility and a repo owner.
+      setGHContext({
+        payload: { repository: { visibility: 'private' } },
+        repo: { owner: 'foo', repo: 'bar' }
+      })
+
+      getInputMock.mockImplementation(mockInput(inputs))
+      getBooleanInputMock.mockImplementation(() => false)
+
+      await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
+      await mockTSA({ baseURL: TSA_INTERNAL_URL })
+    })
+
+    it('invokes the action w/o error', async () => {
+      await main.run()
+
+      expect(runMock).toHaveReturned()
+    //   expect(debugMock).toHaveBeenNthCalledWith(
+    //     1,
+    //     expect.stringMatching('private')
+    //   )
+    //   expect(infoMock).toHaveBeenNthCalledWith(
+    //     1,
+    //     expect.stringMatching('https://in-toto.io/Statement/v0.1')
+    //   )
+    //   expect(infoMock).toHaveBeenNthCalledWith(
+    //     2,
+    //     expect.stringMatching('-----BEGIN CERTIFICATE-----')
+    //   )
+    //   expect(infoMock).toHaveBeenNthCalledWith(
+    //     3,
+    //     expect.stringMatching(/attestation uploaded/i)
+    //   )
+    //   expect(infoMock).toHaveBeenNthCalledWith(
+    //     4,
+    //     expect.stringMatching(attestationID)
+    //   )
+    //   expect(setOutputMock).toHaveBeenNthCalledWith(
+    //     1,
+    //     'bundle',
+    //     expect.anything()
+    //   )
+    //   expect(setFailedMock).not.toHaveBeenCalled()
     })
   })
 

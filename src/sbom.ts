@@ -51,6 +51,9 @@ export const generateSBOMStatement = (subject: Subject, sbom: Sbom): object => {
   if (sbom.type === 'spdx') {
     return generateSPDXIntoto(subject, sbom.object)
   }
+  if (sbom.type === 'cyclonedx') {
+    return generateCycloneDXIntoto(subject, sbom.object)
+  }
   throw new Error('Unsupported SBOM format')
 }
 
