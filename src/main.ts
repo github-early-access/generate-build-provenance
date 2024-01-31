@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import * as github from '@actions/github'
 import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
 import { attachArtifactToImage } from './oci'
 import { generateProvenance, SLSA_PREDICATE_V1_TYPE } from './provenance'
@@ -104,6 +103,7 @@ const attest = async (
     core.info(`${subject.name}@${artifact.digest}`)
   }
 
+  await new Promise(r => setTimeout(r, 1000))
   return attestation
 }
 

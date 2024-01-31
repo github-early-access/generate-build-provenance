@@ -62273,6 +62273,7 @@ const attest = async (subject, visibility) => {
         core.info(highlight('Attestation uploaded to registry'));
         core.info(`${subject.name}@${artifact.digest}`);
     }
+    await new Promise(r => setTimeout(r, 1000));
     return attestation;
 };
 const highlight = (str) => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`;
