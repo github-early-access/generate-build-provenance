@@ -25,9 +25,10 @@ export async function run(): Promise<void> {
     const subjects = await subjectFromInputs()
 
     // Generate attestations for each subject serially
-    const attestations = await Promise.all(
-      subjects.map(async subject => await attest(subject, visibility))
-    )
+    const attestations: Attestation[] = []
+    for (let subject of subjects) {
+      attestations.push(await attest(subject, visibility))
+    }
 
     // Set bundle as action output, but ONLY IF there is a single attestation
     if (attestations.length === 1) {
@@ -103,6 +104,7 @@ const attest = async (
     core.info(`${subject.name}@${artifact.digest}`)
   }
 
+  core.info('about to wait')
   await new Promise(r => setTimeout(r, 1000))
   return attestation
 }

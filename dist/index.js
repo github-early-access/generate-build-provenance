@@ -62223,7 +62223,10 @@ async function run() {
         // Calculate subject from inputs and generate provenance
         const subjects = await (0, subject_1.subjectFromInputs)();
         // Generate attestations for each subject serially
-        const attestations = await Promise.all(subjects.map(async (subject) => await attest(subject, visibility)));
+        const attestations = [];
+        for (let subject of subjects) {
+            attestations.push(await attest(subject, visibility));
+        }
         // Set bundle as action output, but ONLY IF there is a single attestation
         if (attestations.length === 1) {
             core.setOutput('bundle', attestations[0].bundle);
@@ -62273,6 +62276,7 @@ const attest = async (subject, visibility) => {
         core.info(highlight('Attestation uploaded to registry'));
         core.info(`${subject.name}@${artifact.digest}`);
     }
+    core.info('about to wait');
     await new Promise(r => setTimeout(r, 1000));
     return attestation;
 };
