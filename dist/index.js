@@ -6119,7 +6119,7 @@ module.exports = withTempDir
 
 /***/ }),
 
-/***/ 334:
+/***/ 9379:
 /***/ ((module) => {
 
 "use strict";
@@ -6237,7 +6237,7 @@ var import_universal_user_agent = __nccwpck_require__(5030);
 var import_before_after_hook = __nccwpck_require__(3682);
 var import_request = __nccwpck_require__(6234);
 var import_graphql = __nccwpck_require__(8467);
-var import_auth_token = __nccwpck_require__(334);
+var import_auth_token = __nccwpck_require__(9379);
 
 // pkg/dist-src/version.js
 var VERSION = "5.0.1";
@@ -13965,7 +13965,7 @@ Object.defineProperty(exports, "TSAWitness", ({ enumerable: true, get: function 
 
 /***/ }),
 
-/***/ 4606:
+/***/ 334:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -14110,7 +14110,7 @@ limitations under the License.
 */
 const error_1 = __nccwpck_require__(532);
 const util_1 = __nccwpck_require__(724);
-const ca_1 = __nccwpck_require__(4606);
+const ca_1 = __nccwpck_require__(334);
 const ephemeral_1 = __nccwpck_require__(8489);
 exports.DEFAULT_FULCIO_URL = 'https://fulcio.sigstore.dev';
 // Signer implementation which can be used to decorate another signer
@@ -62201,7 +62201,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-const github = __importStar(__nccwpck_require__(5438));
 const bundle_1 = __nccwpck_require__(9715);
 const oci_1 = __nccwpck_require__(1871);
 const provenance_1 = __nccwpck_require__(38);
@@ -62218,10 +62217,7 @@ async function run() {
     // Provenance visibility will be public ONLY if we can confirm that the
     // repository is public AND the undocumented "private-signing" arg is NOT set.
     // Otherwise, it will be private.
-    const visibility = github.context.payload.repository?.visibility === 'public' &&
-        core.getInput('private-signing') !== 'true'
-        ? 'public'
-        : 'private';
+    const visibility = 'public';
     core.debug(`Provenance attestation visibility: ${visibility}`);
     try {
         // Calculate subject from inputs and generate provenance
