@@ -92,10 +92,38 @@ describe('getRegistryCredentials', () => {
       )
     })
 
-    it('throws an error', () => {
+    it('returns the credentials', () => {
       const creds = getRegistryCredentials(registryName)
 
       expect(creds).toEqual({ username, password })
+    })
+  })
+
+  describe('when credentials specify an identity token', () => {
+    const username = 'username'
+    const password = 'password'
+    const token = 'identitytoken'
+    const dockerConfig = {
+      auths: {
+        [registryName]: {
+          auth: Buffer.from(`${username}:${password}`).toString('base64'),
+          identitytoken: token
+        }
+      }
+    }
+
+    beforeEach(() => {
+      fs.writeFileSync(
+        path.join(tempDir, '.docker', 'config.json'),
+        JSON.stringify(dockerConfig),
+        {}
+      )
+    })
+
+    it('returns the credentials', () => {
+      const creds = getRegistryCredentials(registryName)
+
+      expect(creds).toEqual({ username, password: token })
     })
   })
 
@@ -118,7 +146,7 @@ describe('getRegistryCredentials', () => {
       )
     })
 
-    it('throws an error', () => {
+    it('returns the credentials', () => {
       const creds = getRegistryCredentials(registryName)
 
       expect(creds).toEqual({ username, password })

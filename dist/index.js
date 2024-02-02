@@ -62343,7 +62343,11 @@ const getRegistryCredentials = (registry) => {
     if (!creds) {
         throw new Error(`No credentials found for registry ${registry}`);
     }
-    return (0, exports.fromBasicAuth)(creds.auth);
+    // Extract username/password from auth string
+    const { username, password } = (0, exports.fromBasicAuth)(creds.auth);
+    // If the identitytoken is present, use it as the password (primarily for ACR)
+    const pass = creds.identitytoken ? creds.identitytoken : password;
+    return { username, password: pass };
 };
 exports.getRegistryCredentials = getRegistryCredentials;
 // Encode the username and password as base64-encoded basicauth value
