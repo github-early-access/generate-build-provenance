@@ -8,6 +8,8 @@ on:
     branches-ignore:
       - main
 
+permissions: {}
+
 jobs:
   lint:
     name: Lint Code Base
@@ -22,6 +24,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         id: setup-node
@@ -36,7 +40,7 @@ jobs:
 
       - name: Lint Code Base
         id: super-linter
-        uses: super-linter/super-linter/slim@a8150b40c89574adb5f68bf9502b890a236a06b3 # v5.7.2
+        uses: super-linter/super-linter/slim@ff5037c06042e564803502feb97f8a686f3b0171 # v6.0.0
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
