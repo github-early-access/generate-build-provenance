@@ -19,6 +19,8 @@ on:
       - '**.md'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   check-dist:
     name: Check dist/

@@ -8,6 +8,8 @@ on:
     branches-ignore:
       - main
 
+permissions: {}
+
 jobs:
   lint:
     name: Lint Code Base
