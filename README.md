@@ -14,12 +14,11 @@ attest,
    permissions:
      id-token: write
      contents: write
-     packages: write
    ```
 
    The `id-token` permission gives the action the ability to mint the OIDC token
-   necessary to request a Sigstore signing certificate. The `contents` and
-   `packages` permissions are necessary to persist the attestation.
+   necessary to request a Sigstore signing certificate. The `contents`
+   permission is necessary to persist the attestation.
 
    > **NOTE**: The set of required permissions will be refined in a future
    > release.
@@ -168,7 +167,6 @@ jobs:
   build:
     permissions:
       id-token: write
-      packages: write
       contents: write
 
     steps:
@@ -197,7 +195,6 @@ jobs:
   build:
     permissions:
       id-token: write
-      packages: write
       contents: write
 
     steps:
