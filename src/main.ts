@@ -26,6 +26,12 @@ export async function run(): Promise<void> {
   core.debug(`Provenance attestation visibility: ${visibility}`)
 
   try {
+    if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+      throw new Error(
+        'missing "id-token" permission. Please add "permissions: id-token: write" to your workflow.'
+      )
+    }
+
     // Calculate subject from inputs and generate provenance
     const subjects = await subjectFromInputs()
 

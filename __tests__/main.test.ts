@@ -80,6 +80,32 @@ describe('action', () => {
     setGHContext(originalContext)
   })
 
+  describe('when ACTIONS_ID_TOKEN_REQUEST_URL is not set', () => {
+    const inputs = {
+      'subject-digest':
+        'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
+      'subject-name': 'subject',
+      'github-token': 'gh-token'
+    }
+
+    beforeEach(() => {
+      // Nullify the OIDC token URL
+      process.env.ACTIONS_ID_TOKEN_REQUEST_URL = ''
+
+      getInputMock.mockImplementation(mockInput(inputs))
+      getBooleanInputMock.mockImplementation(() => false)
+    })
+
+    it('sets a failed status', async () => {
+      await main.run()
+
+      expect(runMock).toHaveReturned()
+      expect(setFailedMock).toHaveBeenCalledWith(
+        expect.stringMatching(/missing "id-token" permission/)
+      )
+    })
+  })
+
   describe('when the repository is private', () => {
     const inputs = {
       'subject-digest':
