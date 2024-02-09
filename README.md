@@ -276,9 +276,6 @@ jobs:
           push-to-registry: true
 ```
 
-> **NOTE**: At this time, publishing attestations to AWS Elastic Container
-> Registry (ECR) is NOT supported.
-
 [1]: https://www.sigstore.dev/
 [2]: https://slsa.dev/spec/v1.0/provenance
 [3]: https://github.com/github-early-access/gh-attestation
