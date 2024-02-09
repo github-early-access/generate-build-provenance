@@ -10464,7 +10464,7 @@ exports.parseBitString = parseBitString;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ASN1Tag = exports.UNIVERSAL_TAG = void 0;
+exports.ASN1Tag = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -10481,7 +10481,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 const error_1 = __nccwpck_require__(6136);
-exports.UNIVERSAL_TAG = {
+const UNIVERSAL_TAG = {
     BOOLEAN: 0x01,
     INTEGER: 0x02,
     BIT_STRING: 0x03,
@@ -10523,25 +10523,25 @@ class ASN1Tag {
         return num !== undefined ? res && this.number === num : res;
     }
     isBoolean() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.BOOLEAN;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.BOOLEAN;
     }
     isInteger() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.INTEGER;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.INTEGER;
     }
     isBitString() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.BIT_STRING;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.BIT_STRING;
     }
     isOctetString() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.OCTET_STRING;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.OCTET_STRING;
     }
     isOID() {
-        return (this.isUniversal() && this.number === exports.UNIVERSAL_TAG.OBJECT_IDENTIFIER);
+        return (this.isUniversal() && this.number === UNIVERSAL_TAG.OBJECT_IDENTIFIER);
     }
     isUTCTime() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.UTC_TIME;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.UTC_TIME;
     }
     isGeneralizedTime() {
-        return this.isUniversal() && this.number === exports.UNIVERSAL_TAG.GENERALIZED_TIME;
+        return this.isUniversal() && this.number === UNIVERSAL_TAG.GENERALIZED_TIME;
     }
     toDER() {
         return this.number | (this.constructed ? 0x20 : 0x00) | (this.class << 6);
@@ -11254,7 +11254,7 @@ exports.TSTInfo = TSTInfo;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ByteStream = exports.StreamError = void 0;
+exports.ByteStream = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -11272,7 +11272,6 @@ limitations under the License.
 */
 class StreamError extends Error {
 }
-exports.StreamError = StreamError;
 class ByteStream {
     constructor(buffer) {
         this.start = 0;
@@ -14186,6 +14185,7 @@ exports.FulcioSigner = FulcioSigner;
 
 "use strict";
 
+/* istanbul ignore file */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FulcioSigner = exports.DEFAULT_FULCIO_URL = void 0;
 /*
@@ -14352,6 +14352,7 @@ exports.getUserAgent = getUserAgent;
 
 "use strict";
 
+/* istanbul ignore file */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.TSAWitness = exports.RekorWitness = exports.DEFAULT_REKOR_URL = void 0;
 /*
@@ -73952,7 +73953,7 @@ exports.LRUCache = LRUCache;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"2.2.1"};
+module.exports = {"i8":"2.2.2"};
 
 /***/ }),
 
