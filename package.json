@@ -80,7 +80,7 @@
     "@actions/github": "^6.0.0",
     "@actions/glob": "^0.4.0",
     "@sigstore/bundle": "^2.1.1",
-    "@sigstore/sign": "^2.2.1",
+    "@sigstore/sign": "^2.2.2",
     "make-fetch-happen": "^13.0.0"
   },
   "devDependencies": {
