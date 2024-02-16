@@ -9708,9 +9708,10 @@ function toKeyContent(options) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.isBundleWithDsseEnvelope = exports.isBundleWithMessageSignature = exports.isBundleWithPublicKey = exports.isBundleWithCertificateChain = exports.BUNDLE_V02_MEDIA_TYPE = exports.BUNDLE_V01_MEDIA_TYPE = void 0;
+exports.isBundleWithDsseEnvelope = exports.isBundleWithMessageSignature = exports.isBundleWithPublicKey = exports.isBundleWithCertificateChain = exports.BUNDLE_V03_MEDIA_TYPE = exports.BUNDLE_V02_MEDIA_TYPE = exports.BUNDLE_V01_MEDIA_TYPE = void 0;
 exports.BUNDLE_V01_MEDIA_TYPE = 'application/vnd.dev.sigstore.bundle+json;version=0.1';
 exports.BUNDLE_V02_MEDIA_TYPE = 'application/vnd.dev.sigstore.bundle+json;version=0.2';
+exports.BUNDLE_V03_MEDIA_TYPE = 'application/vnd.dev.sigstore.bundle+json;version=0.3';
 // Type guards for bundle variants.
 function isBundleWithCertificateChain(b) {
     return b.verificationMaterial.content.$case === 'x509CertificateChain';
@@ -9771,7 +9772,7 @@ exports.ValidationError = ValidationError;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.isBundleV01 = exports.assertBundleV01 = exports.assertBundleLatest = exports.assertBundle = exports.envelopeToJSON = exports.envelopeFromJSON = exports.bundleToJSON = exports.bundleFromJSON = exports.ValidationError = exports.isBundleWithPublicKey = exports.isBundleWithMessageSignature = exports.isBundleWithDsseEnvelope = exports.isBundleWithCertificateChain = exports.BUNDLE_V02_MEDIA_TYPE = exports.BUNDLE_V01_MEDIA_TYPE = exports.toMessageSignatureBundle = exports.toDSSEBundle = void 0;
+exports.isBundleV01 = exports.assertBundleV02 = exports.assertBundleV01 = exports.assertBundleLatest = exports.assertBundle = exports.envelopeToJSON = exports.envelopeFromJSON = exports.bundleToJSON = exports.bundleFromJSON = exports.ValidationError = exports.isBundleWithPublicKey = exports.isBundleWithMessageSignature = exports.isBundleWithDsseEnvelope = exports.isBundleWithCertificateChain = exports.BUNDLE_V03_MEDIA_TYPE = exports.BUNDLE_V02_MEDIA_TYPE = exports.BUNDLE_V01_MEDIA_TYPE = exports.toMessageSignatureBundle = exports.toDSSEBundle = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -9793,6 +9794,7 @@ Object.defineProperty(exports, "toMessageSignatureBundle", ({ enumerable: true, 
 var bundle_1 = __nccwpck_require__(2712);
 Object.defineProperty(exports, "BUNDLE_V01_MEDIA_TYPE", ({ enumerable: true, get: function () { return bundle_1.BUNDLE_V01_MEDIA_TYPE; } }));
 Object.defineProperty(exports, "BUNDLE_V02_MEDIA_TYPE", ({ enumerable: true, get: function () { return bundle_1.BUNDLE_V02_MEDIA_TYPE; } }));
+Object.defineProperty(exports, "BUNDLE_V03_MEDIA_TYPE", ({ enumerable: true, get: function () { return bundle_1.BUNDLE_V03_MEDIA_TYPE; } }));
 Object.defineProperty(exports, "isBundleWithCertificateChain", ({ enumerable: true, get: function () { return bundle_1.isBundleWithCertificateChain; } }));
 Object.defineProperty(exports, "isBundleWithDsseEnvelope", ({ enumerable: true, get: function () { return bundle_1.isBundleWithDsseEnvelope; } }));
 Object.defineProperty(exports, "isBundleWithMessageSignature", ({ enumerable: true, get: function () { return bundle_1.isBundleWithMessageSignature; } }));
@@ -9808,6 +9810,7 @@ var validate_1 = __nccwpck_require__(9599);
 Object.defineProperty(exports, "assertBundle", ({ enumerable: true, get: function () { return validate_1.assertBundle; } }));
 Object.defineProperty(exports, "assertBundleLatest", ({ enumerable: true, get: function () { return validate_1.assertBundleLatest; } }));
 Object.defineProperty(exports, "assertBundleV01", ({ enumerable: true, get: function () { return validate_1.assertBundleV01; } }));
+Object.defineProperty(exports, "assertBundleV02", ({ enumerable: true, get: function () { return validate_1.assertBundleV02; } }));
 Object.defineProperty(exports, "isBundleV01", ({ enumerable: true, get: function () { return validate_1.isBundleV01; } }));
 
 
@@ -9840,12 +9843,16 @@ const bundle_1 = __nccwpck_require__(2712);
 const validate_1 = __nccwpck_require__(9599);
 const bundleFromJSON = (obj) => {
     const bundle = protobuf_specs_1.Bundle.fromJSON(obj);
-    (0, validate_1.assertBundle)(bundle);
-    if (bundle.mediaType === bundle_1.BUNDLE_V01_MEDIA_TYPE) {
-        (0, validate_1.assertBundleV01)(bundle);
-    }
-    else {
-        (0, validate_1.assertBundleLatest)(bundle);
+    switch (bundle.mediaType) {
+        case bundle_1.BUNDLE_V01_MEDIA_TYPE:
+            (0, validate_1.assertBundleV01)(bundle);
+            break;
+        case bundle_1.BUNDLE_V02_MEDIA_TYPE:
+            (0, validate_1.assertBundleV02)(bundle);
+            break;
+        default:
+            (0, validate_1.assertBundleLatest)(bundle);
+            break;
     }
     return bundle;
 };
@@ -9872,7 +9879,7 @@ exports.envelopeToJSON = envelopeToJSON;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.assertBundleLatest = exports.isBundleV01 = exports.assertBundleV01 = exports.assertBundle = void 0;
+exports.assertBundleLatest = exports.assertBundleV02 = exports.isBundleV01 = exports.assertBundleV01 = exports.assertBundle = void 0;
 /*
 Copyright 2023 The Sigstore Authors.
 
@@ -9888,13 +9895,61 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-const bundle_1 = __nccwpck_require__(2712);
 const error_1 = __nccwpck_require__(3802);
 // Performs basic validation of a Sigstore bundle to ensure that all required
 // fields are populated. This is not a complete validation of the bundle, but
 // rather a check that the bundle is in a valid state to be processed by the
 // rest of the code.
 function assertBundle(b) {
+    const invalidValues = validateBundleBase(b);
+    if (invalidValues.length > 0) {
+        throw new error_1.ValidationError('invalid bundle', invalidValues);
+    }
+}
+exports.assertBundle = assertBundle;
+// Asserts that the given bundle conforms to the v0.1 bundle format.
+function assertBundleV01(b) {
+    const invalidValues = [];
+    invalidValues.push(...validateBundleBase(b));
+    invalidValues.push(...validateInclusionPromise(b));
+    if (invalidValues.length > 0) {
+        throw new error_1.ValidationError('invalid v0.1 bundle', invalidValues);
+    }
+}
+exports.assertBundleV01 = assertBundleV01;
+// Type guard to determine if Bundle is a v0.1 bundle.
+function isBundleV01(b) {
+    try {
+        assertBundleV01(b);
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+}
+exports.isBundleV01 = isBundleV01;
+// Asserts that the given bundle conforms to the v0.2 bundle format.
+function assertBundleV02(b) {
+    const invalidValues = [];
+    invalidValues.push(...validateBundleBase(b));
+    invalidValues.push(...validateInclusionProof(b));
+    if (invalidValues.length > 0) {
+        throw new error_1.ValidationError('invalid v0.2 bundle', invalidValues);
+    }
+}
+exports.assertBundleV02 = assertBundleV02;
+// Asserts that the given bundle conforms to the newest (0.3) bundle format.
+function assertBundleLatest(b) {
+    const invalidValues = [];
+    invalidValues.push(...validateBundleBase(b));
+    invalidValues.push(...validateInclusionProof(b));
+    invalidValues.push(...validateNoCertificateChain(b));
+    if (invalidValues.length > 0) {
+        throw new error_1.ValidationError('invalid bundle', invalidValues);
+    }
+}
+exports.assertBundleLatest = assertBundleLatest;
+function validateBundleBase(b) {
     const invalidValues = [];
     // Media type validation
     if (b.mediaType === undefined ||
@@ -9956,6 +10011,11 @@ function assertBundle(b) {
                         }
                     });
                     break;
+                case 'certificate':
+                    if (b.verificationMaterial.content.certificate.rawBytes.length === 0) {
+                        invalidValues.push('verificationMaterial.content.certificate.rawBytes');
+                    }
+                    break;
             }
         }
         if (b.verificationMaterial.tlogEntries === undefined) {
@@ -9974,17 +10034,11 @@ function assertBundle(b) {
             }
         }
     }
-    if (invalidValues.length > 0) {
-        throw new error_1.ValidationError('invalid bundle', invalidValues);
-    }
+    return invalidValues;
 }
-exports.assertBundle = assertBundle;
-// Asserts that the given bundle conforms to the v0.1 bundle format.
-function assertBundleV01(b) {
+// Necessary for V01 bundles
+function validateInclusionPromise(b) {
     const invalidValues = [];
-    if (b.mediaType && b.mediaType !== bundle_1.BUNDLE_V01_MEDIA_TYPE) {
-        invalidValues.push('mediaType');
-    }
     if (b.verificationMaterial &&
         b.verificationMaterial.tlogEntries?.length > 0) {
         b.verificationMaterial.tlogEntries.forEach((entry, i) => {
@@ -9993,24 +10047,10 @@ function assertBundleV01(b) {
             }
         });
     }
-    if (invalidValues.length > 0) {
-        throw new error_1.ValidationError('invalid v0.1 bundle', invalidValues);
-    }
+    return invalidValues;
 }
-exports.assertBundleV01 = assertBundleV01;
-// Type guard to determine if Bundle is a v0.1 bundle.
-function isBundleV01(b) {
-    try {
-        assertBundleV01(b);
-        return true;
-    }
-    catch (e) {
-        return false;
-    }
-}
-exports.isBundleV01 = isBundleV01;
-// Asserts that the given bundle conforms to the newest (0.2) bundle format.
-function assertBundleLatest(b) {
+// Necessary for V02 and later bundles
+function validateInclusionProof(b) {
     const invalidValues = [];
     if (b.verificationMaterial &&
         b.verificationMaterial.tlogEntries?.length > 0) {
@@ -10025,11 +10065,16 @@ function assertBundleLatest(b) {
             }
         });
     }
-    if (invalidValues.length > 0) {
-        throw new error_1.ValidationError('invalid v0.2 bundle', invalidValues);
-    }
+    return invalidValues;
 }
-exports.assertBundleLatest = assertBundleLatest;
+// Necessary for V03 and later bundles
+function validateNoCertificateChain(b) {
+    const invalidValues = [];
+    if (b.verificationMaterial?.content?.$case === 'x509CertificateChain') {
+        invalidValues.push('verificationMaterial.content.$case');
+    }
+    return invalidValues;
+}
 
 
 /***/ }),
@@ -12113,7 +12158,9 @@ exports.VerificationMaterial = {
                         $case: "x509CertificateChain",
                         x509CertificateChain: sigstore_common_1.X509CertificateChain.fromJSON(object.x509CertificateChain),
                     }
-                    : undefined,
+                    : isSet(object.certificate)
+                        ? { $case: "certificate", certificate: sigstore_common_1.X509Certificate.fromJSON(object.certificate) }
+                        : undefined,
             tlogEntries: Array.isArray(object?.tlogEntries)
                 ? object.tlogEntries.map((e) => sigstore_rekor_1.TransparencyLogEntry.fromJSON(e))
                 : [],
@@ -12129,6 +12176,10 @@ exports.VerificationMaterial = {
         message.content?.$case === "x509CertificateChain" &&
             (obj.x509CertificateChain = message.content?.x509CertificateChain
                 ? sigstore_common_1.X509CertificateChain.toJSON(message.content?.x509CertificateChain)
+                : undefined);
+        message.content?.$case === "certificate" &&
+            (obj.certificate = message.content?.certificate
+                ? sigstore_common_1.X509Certificate.toJSON(message.content?.certificate)
                 : undefined);
         if (message.tlogEntries) {
             obj.tlogEntries = message.tlogEntries.map((e) => e ? sigstore_rekor_1.TransparencyLogEntry.toJSON(e) : undefined);
@@ -12203,6 +12254,10 @@ var HashAlgorithm;
 (function (HashAlgorithm) {
     HashAlgorithm[HashAlgorithm["HASH_ALGORITHM_UNSPECIFIED"] = 0] = "HASH_ALGORITHM_UNSPECIFIED";
     HashAlgorithm[HashAlgorithm["SHA2_256"] = 1] = "SHA2_256";
+    HashAlgorithm[HashAlgorithm["SHA2_384"] = 2] = "SHA2_384";
+    HashAlgorithm[HashAlgorithm["SHA2_512"] = 3] = "SHA2_512";
+    HashAlgorithm[HashAlgorithm["SHA3_256"] = 4] = "SHA3_256";
+    HashAlgorithm[HashAlgorithm["SHA3_384"] = 5] = "SHA3_384";
 })(HashAlgorithm = exports.HashAlgorithm || (exports.HashAlgorithm = {}));
 function hashAlgorithmFromJSON(object) {
     switch (object) {
@@ -12212,6 +12267,18 @@ function hashAlgorithmFromJSON(object) {
         case 1:
         case "SHA2_256":
             return HashAlgorithm.SHA2_256;
+        case 2:
+        case "SHA2_384":
+            return HashAlgorithm.SHA2_384;
+        case 3:
+        case "SHA2_512":
+            return HashAlgorithm.SHA2_512;
+        case 4:
+        case "SHA3_256":
+            return HashAlgorithm.SHA3_256;
+        case 5:
+        case "SHA3_384":
+            return HashAlgorithm.SHA3_384;
         default:
             throw new tsProtoGlobalThis.Error("Unrecognized enum value " + object + " for enum HashAlgorithm");
     }
@@ -12223,6 +12290,14 @@ function hashAlgorithmToJSON(object) {
             return "HASH_ALGORITHM_UNSPECIFIED";
         case HashAlgorithm.SHA2_256:
             return "SHA2_256";
+        case HashAlgorithm.SHA2_384:
+            return "SHA2_384";
+        case HashAlgorithm.SHA2_512:
+            return "SHA2_512";
+        case HashAlgorithm.SHA3_256:
+            return "SHA3_256";
+        case HashAlgorithm.SHA3_384:
+            return "SHA3_384";
         default:
             throw new tsProtoGlobalThis.Error("Unrecognized enum value " + object + " for enum HashAlgorithm");
     }
@@ -12231,6 +12306,16 @@ exports.hashAlgorithmToJSON = hashAlgorithmToJSON;
 /**
  * Details of a specific public key, capturing the the key encoding method,
  * and signature algorithm.
+ *
+ * PublicKeyDetails captures the public key/hash algorithm combinations
+ * recommended in the Sigstore ecosystem.
+ *
+ * This is modelled as a linear set as we want to provide a small number of
+ * opinionated options instead of allowing every possible permutation.
+ *
+ * Any changes to this enum MUST be reflected in the algorithm registry.
+ * See: docs/algorithm-registry.md
+ *
  * To avoid the possibility of contradicting formats such as PKCS1 with
  * ED25519 the valid permutations are listed as a linear set instead of a
  * cartesian set (i.e one combined variable instead of two, one for encoding
@@ -12239,18 +12324,60 @@ exports.hashAlgorithmToJSON = hashAlgorithmToJSON;
 var PublicKeyDetails;
 (function (PublicKeyDetails) {
     PublicKeyDetails[PublicKeyDetails["PUBLIC_KEY_DETAILS_UNSPECIFIED"] = 0] = "PUBLIC_KEY_DETAILS_UNSPECIFIED";
-    /** PKCS1_RSA_PKCS1V5 - RSA */
+    /**
+     * PKCS1_RSA_PKCS1V5 - RSA
+     *
+     * @deprecated
+     */
     PublicKeyDetails[PublicKeyDetails["PKCS1_RSA_PKCS1V5"] = 1] = "PKCS1_RSA_PKCS1V5";
-    /** PKCS1_RSA_PSS - See RFC8017 */
+    /**
+     * PKCS1_RSA_PSS - See RFC8017
+     *
+     * @deprecated
+     */
     PublicKeyDetails[PublicKeyDetails["PKCS1_RSA_PSS"] = 2] = "PKCS1_RSA_PSS";
+    /** @deprecated */
     PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PKCS1V5"] = 3] = "PKIX_RSA_PKCS1V5";
+    /** @deprecated */
     PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PSS"] = 4] = "PKIX_RSA_PSS";
-    /** PKIX_ECDSA_P256_SHA_256 - ECDSA */
-    PublicKeyDetails[PublicKeyDetails["PKIX_ECDSA_P256_SHA_256"] = 5] = "PKIX_ECDSA_P256_SHA_256";
-    /** PKIX_ECDSA_P256_HMAC_SHA_256 - See RFC6979 */
+    /** PKIX_RSA_PKCS1V15_2048_SHA256 - RSA public key in PKIX format, PKCS#1v1.5 signature */
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PKCS1V15_2048_SHA256"] = 9] = "PKIX_RSA_PKCS1V15_2048_SHA256";
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PKCS1V15_3072_SHA256"] = 10] = "PKIX_RSA_PKCS1V15_3072_SHA256";
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PKCS1V15_4096_SHA256"] = 11] = "PKIX_RSA_PKCS1V15_4096_SHA256";
+    /** PKIX_RSA_PSS_2048_SHA256 - RSA public key in PKIX format, RSASSA-PSS signature */
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PSS_2048_SHA256"] = 16] = "PKIX_RSA_PSS_2048_SHA256";
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PSS_3072_SHA256"] = 17] = "PKIX_RSA_PSS_3072_SHA256";
+    PublicKeyDetails[PublicKeyDetails["PKIX_RSA_PSS_4096_SHA256"] = 18] = "PKIX_RSA_PSS_4096_SHA256";
+    /**
+     * PKIX_ECDSA_P256_HMAC_SHA_256 - ECDSA
+     *
+     * @deprecated
+     */
     PublicKeyDetails[PublicKeyDetails["PKIX_ECDSA_P256_HMAC_SHA_256"] = 6] = "PKIX_ECDSA_P256_HMAC_SHA_256";
+    /** PKIX_ECDSA_P256_SHA_256 - See NIST FIPS 186-4 */
+    PublicKeyDetails[PublicKeyDetails["PKIX_ECDSA_P256_SHA_256"] = 5] = "PKIX_ECDSA_P256_SHA_256";
+    PublicKeyDetails[PublicKeyDetails["PKIX_ECDSA_P384_SHA_384"] = 12] = "PKIX_ECDSA_P384_SHA_384";
+    PublicKeyDetails[PublicKeyDetails["PKIX_ECDSA_P521_SHA_512"] = 13] = "PKIX_ECDSA_P521_SHA_512";
     /** PKIX_ED25519 - Ed 25519 */
     PublicKeyDetails[PublicKeyDetails["PKIX_ED25519"] = 7] = "PKIX_ED25519";
+    PublicKeyDetails[PublicKeyDetails["PKIX_ED25519_PH"] = 8] = "PKIX_ED25519_PH";
+    /**
+     * LMS_SHA256 - LMS and LM-OTS
+     *
+     * These keys and signatures may be used by private Sigstore
+     * deployments, but are not currently supported by the public
+     * good instance.
+     *
+     * USER WARNING: LMS and LM-OTS are both stateful signature schemes.
+     * Using them correctly requires discretion and careful consideration
+     * to ensure that individual secret keys are not used more than once.
+     * In addition, LM-OTS is a single-use scheme, meaning that it
+     * MUST NOT be used for more than one signature per LM-OTS key.
+     * If you cannot maintain these invariants, you MUST NOT use these
+     * schemes.
+     */
+    PublicKeyDetails[PublicKeyDetails["LMS_SHA256"] = 14] = "LMS_SHA256";
+    PublicKeyDetails[PublicKeyDetails["LMOTS_SHA256"] = 15] = "LMOTS_SHA256";
 })(PublicKeyDetails = exports.PublicKeyDetails || (exports.PublicKeyDetails = {}));
 function publicKeyDetailsFromJSON(object) {
     switch (object) {
@@ -12269,15 +12396,48 @@ function publicKeyDetailsFromJSON(object) {
         case 4:
         case "PKIX_RSA_PSS":
             return PublicKeyDetails.PKIX_RSA_PSS;
-        case 5:
-        case "PKIX_ECDSA_P256_SHA_256":
-            return PublicKeyDetails.PKIX_ECDSA_P256_SHA_256;
+        case 9:
+        case "PKIX_RSA_PKCS1V15_2048_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PKCS1V15_2048_SHA256;
+        case 10:
+        case "PKIX_RSA_PKCS1V15_3072_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PKCS1V15_3072_SHA256;
+        case 11:
+        case "PKIX_RSA_PKCS1V15_4096_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PKCS1V15_4096_SHA256;
+        case 16:
+        case "PKIX_RSA_PSS_2048_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PSS_2048_SHA256;
+        case 17:
+        case "PKIX_RSA_PSS_3072_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PSS_3072_SHA256;
+        case 18:
+        case "PKIX_RSA_PSS_4096_SHA256":
+            return PublicKeyDetails.PKIX_RSA_PSS_4096_SHA256;
         case 6:
         case "PKIX_ECDSA_P256_HMAC_SHA_256":
             return PublicKeyDetails.PKIX_ECDSA_P256_HMAC_SHA_256;
+        case 5:
+        case "PKIX_ECDSA_P256_SHA_256":
+            return PublicKeyDetails.PKIX_ECDSA_P256_SHA_256;
+        case 12:
+        case "PKIX_ECDSA_P384_SHA_384":
+            return PublicKeyDetails.PKIX_ECDSA_P384_SHA_384;
+        case 13:
+        case "PKIX_ECDSA_P521_SHA_512":
+            return PublicKeyDetails.PKIX_ECDSA_P521_SHA_512;
         case 7:
         case "PKIX_ED25519":
             return PublicKeyDetails.PKIX_ED25519;
+        case 8:
+        case "PKIX_ED25519_PH":
+            return PublicKeyDetails.PKIX_ED25519_PH;
+        case 14:
+        case "LMS_SHA256":
+            return PublicKeyDetails.LMS_SHA256;
+        case 15:
+        case "LMOTS_SHA256":
+            return PublicKeyDetails.LMOTS_SHA256;
         default:
             throw new tsProtoGlobalThis.Error("Unrecognized enum value " + object + " for enum PublicKeyDetails");
     }
@@ -12295,12 +12455,34 @@ function publicKeyDetailsToJSON(object) {
             return "PKIX_RSA_PKCS1V5";
         case PublicKeyDetails.PKIX_RSA_PSS:
             return "PKIX_RSA_PSS";
-        case PublicKeyDetails.PKIX_ECDSA_P256_SHA_256:
-            return "PKIX_ECDSA_P256_SHA_256";
+        case PublicKeyDetails.PKIX_RSA_PKCS1V15_2048_SHA256:
+            return "PKIX_RSA_PKCS1V15_2048_SHA256";
+        case PublicKeyDetails.PKIX_RSA_PKCS1V15_3072_SHA256:
+            return "PKIX_RSA_PKCS1V15_3072_SHA256";
+        case PublicKeyDetails.PKIX_RSA_PKCS1V15_4096_SHA256:
+            return "PKIX_RSA_PKCS1V15_4096_SHA256";
+        case PublicKeyDetails.PKIX_RSA_PSS_2048_SHA256:
+            return "PKIX_RSA_PSS_2048_SHA256";
+        case PublicKeyDetails.PKIX_RSA_PSS_3072_SHA256:
+            return "PKIX_RSA_PSS_3072_SHA256";
+        case PublicKeyDetails.PKIX_RSA_PSS_4096_SHA256:
+            return "PKIX_RSA_PSS_4096_SHA256";
         case PublicKeyDetails.PKIX_ECDSA_P256_HMAC_SHA_256:
             return "PKIX_ECDSA_P256_HMAC_SHA_256";
+        case PublicKeyDetails.PKIX_ECDSA_P256_SHA_256:
+            return "PKIX_ECDSA_P256_SHA_256";
+        case PublicKeyDetails.PKIX_ECDSA_P384_SHA_384:
+            return "PKIX_ECDSA_P384_SHA_384";
+        case PublicKeyDetails.PKIX_ECDSA_P521_SHA_512:
+            return "PKIX_ECDSA_P521_SHA_512";
         case PublicKeyDetails.PKIX_ED25519:
             return "PKIX_ED25519";
+        case PublicKeyDetails.PKIX_ED25519_PH:
+            return "PKIX_ED25519_PH";
+        case PublicKeyDetails.LMS_SHA256:
+            return "LMS_SHA256";
+        case PublicKeyDetails.LMOTS_SHA256:
+            return "LMOTS_SHA256";
         default:
             throw new tsProtoGlobalThis.Error("Unrecognized enum value " + object + " for enum PublicKeyDetails");
     }
@@ -12938,7 +13120,7 @@ function isSet(value) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Input = exports.Artifact = exports.ArtifactVerificationOptions_TimestampAuthorityOptions = exports.ArtifactVerificationOptions_CtlogOptions = exports.ArtifactVerificationOptions_TlogOptions = exports.ArtifactVerificationOptions = exports.PublicKeyIdentities = exports.CertificateIdentities = exports.CertificateIdentity = void 0;
+exports.Input = exports.Artifact = exports.ArtifactVerificationOptions_ObserverTimestampOptions = exports.ArtifactVerificationOptions_TlogIntegratedTimestampOptions = exports.ArtifactVerificationOptions_TimestampAuthorityOptions = exports.ArtifactVerificationOptions_CtlogOptions = exports.ArtifactVerificationOptions_TlogOptions = exports.ArtifactVerificationOptions = exports.PublicKeyIdentities = exports.CertificateIdentities = exports.CertificateIdentity = void 0;
 /* eslint-disable */
 const sigstore_bundle_1 = __nccwpck_require__(8293);
 const sigstore_common_1 = __nccwpck_require__(2193);
@@ -13010,7 +13192,14 @@ exports.PublicKeyIdentities = {
     },
 };
 function createBaseArtifactVerificationOptions() {
-    return { signers: undefined, tlogOptions: undefined, ctlogOptions: undefined, tsaOptions: undefined };
+    return {
+        signers: undefined,
+        tlogOptions: undefined,
+        ctlogOptions: undefined,
+        tsaOptions: undefined,
+        integratedTsOptions: undefined,
+        observerOptions: undefined,
+    };
 }
 exports.ArtifactVerificationOptions = {
     fromJSON(object) {
@@ -13032,6 +13221,12 @@ exports.ArtifactVerificationOptions = {
             tsaOptions: isSet(object.tsaOptions)
                 ? exports.ArtifactVerificationOptions_TimestampAuthorityOptions.fromJSON(object.tsaOptions)
                 : undefined,
+            integratedTsOptions: isSet(object.integratedTsOptions)
+                ? exports.ArtifactVerificationOptions_TlogIntegratedTimestampOptions.fromJSON(object.integratedTsOptions)
+                : undefined,
+            observerOptions: isSet(object.observerOptions)
+                ? exports.ArtifactVerificationOptions_ObserverTimestampOptions.fromJSON(object.observerOptions)
+                : undefined,
         };
     },
     toJSON(message) {
@@ -13051,6 +13246,12 @@ exports.ArtifactVerificationOptions = {
             : undefined);
         message.tsaOptions !== undefined && (obj.tsaOptions = message.tsaOptions
             ? exports.ArtifactVerificationOptions_TimestampAuthorityOptions.toJSON(message.tsaOptions)
+            : undefined);
+        message.integratedTsOptions !== undefined && (obj.integratedTsOptions = message.integratedTsOptions
+            ? exports.ArtifactVerificationOptions_TlogIntegratedTimestampOptions.toJSON(message.integratedTsOptions)
+            : undefined);
+        message.observerOptions !== undefined && (obj.observerOptions = message.observerOptions
+            ? exports.ArtifactVerificationOptions_ObserverTimestampOptions.toJSON(message.observerOptions)
             : undefined);
         return obj;
     },
@@ -13078,20 +13279,18 @@ exports.ArtifactVerificationOptions_TlogOptions = {
     },
 };
 function createBaseArtifactVerificationOptions_CtlogOptions() {
-    return { threshold: 0, detachedSct: false, disable: false };
+    return { threshold: 0, disable: false };
 }
 exports.ArtifactVerificationOptions_CtlogOptions = {
     fromJSON(object) {
         return {
             threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
-            detachedSct: isSet(object.detachedSct) ? Boolean(object.detachedSct) : false,
             disable: isSet(object.disable) ? Boolean(object.disable) : false,
         };
     },
     toJSON(message) {
         const obj = {};
         message.threshold !== undefined && (obj.threshold = Math.round(message.threshold));
-        message.detachedSct !== undefined && (obj.detachedSct = message.detachedSct);
         message.disable !== undefined && (obj.disable = message.disable);
         return obj;
     },
@@ -13100,6 +13299,40 @@ function createBaseArtifactVerificationOptions_TimestampAuthorityOptions() {
     return { threshold: 0, disable: false };
 }
 exports.ArtifactVerificationOptions_TimestampAuthorityOptions = {
+    fromJSON(object) {
+        return {
+            threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
+            disable: isSet(object.disable) ? Boolean(object.disable) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        message.threshold !== undefined && (obj.threshold = Math.round(message.threshold));
+        message.disable !== undefined && (obj.disable = message.disable);
+        return obj;
+    },
+};
+function createBaseArtifactVerificationOptions_TlogIntegratedTimestampOptions() {
+    return { threshold: 0, disable: false };
+}
+exports.ArtifactVerificationOptions_TlogIntegratedTimestampOptions = {
+    fromJSON(object) {
+        return {
+            threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
+            disable: isSet(object.disable) ? Boolean(object.disable) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        message.threshold !== undefined && (obj.threshold = Math.round(message.threshold));
+        message.disable !== undefined && (obj.disable = message.disable);
+        return obj;
+    },
+};
+function createBaseArtifactVerificationOptions_ObserverTimestampOptions() {
+    return { threshold: 0, disable: false };
+}
+exports.ArtifactVerificationOptions_ObserverTimestampOptions = {
     fromJSON(object) {
         return {
             threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
@@ -73953,7 +74186,7 @@ exports.LRUCache = LRUCache;
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"2.2.2"};
+module.exports = {"i8":"2.2.3"};
 
 /***/ }),
 
