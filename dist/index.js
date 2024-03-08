@@ -62654,9 +62654,7 @@ class OCIImage {
         this.#client = new registry_1.RegistryClient(image.registry, image.path, opts);
         this.#credentials = creds;
         // If the registry is not OCI-compliant, downgrade to Docker V2 API
-        this.#downgrade =
-            image.registry.includes('docker.io') ||
-                image.registry.includes('amazonaws.com');
+        this.#downgrade = image.registry.includes('amazonaws.com');
     }
     async addArtifact(opts) {
         let artifactDescriptor;
