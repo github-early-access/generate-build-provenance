@@ -9,17 +9,11 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { mockFulcio, mockRekor, mockTSA } from '@sigstore/mock'
+import * as oci from '@sigstore/oci'
+import * as jose from 'jose'
 import nock from 'nock'
-import {
-  FULCIO_INTERNAL_URL,
-  FULCIO_PUBLIC_GOOD_URL,
-  REKOR_PUBLIC_GOOD_URL,
-  SEARCH_PUBLIC_GOOD_URL,
-  TSA_INTERNAL_URL
-} from '../src/endpoints'
+import { SEARCH_PUBLIC_GOOD_URL } from '../src/endpoints'
 import * as main from '../src/main'
-import * as oci from '../src/oci'
-import { CONTENT_TYPE_OCI_MANIFEST } from '../src/oci/constants'
 
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug')
@@ -41,6 +35,26 @@ describe('action', () => {
   const originalEnv = process.env
   const originalContext = { ...github.context }
 
+  const issuer = 'https://token.actions.githubusercontent.com'
+  const audience = 'nobody'
+  const jwksPath = '/.well-known/jwks.json'
+  const tokenPath = '/token'
+
+  const claims = {
+    iss: issuer,
+    aud: 'nobody',
+    repository: 'owner/repo',
+    ref: 'refs/heads/main',
+    sha: 'babca52ab0c93ae16539e5923cb0d7403b9a093b',
+    workflow_ref: 'owner/repo/.github/workflows/main.yml@main',
+    event_name: 'push',
+    repository_id: 'repo-id',
+    repository_owner_id: 'owner-id',
+    run_id: 'run-id',
+    run_attempt: 'run-attempt',
+    runner_environment: 'github-hosted'
+  }
+
   // Fake an OIDC token
   const subject = 'foo@bar.com'
   const oidcPayload = { sub: subject, iss: '' }
@@ -50,26 +64,41 @@ describe('action', () => {
 
   const attestationID = '1234567890'
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks()
-
-    // Mock OIDC token endpoint
-    const tokenURL = 'https://token.url'
-
-    nock(tokenURL)
-      .get('/')
-      .query({ audience: 'sigstore' })
-      .reply(200, { value: oidcToken })
-
-    nock('https://api.github.com')
-      .post(/^\/repos\/.*\/.*\/attestations$/)
-      .reply(201, { id: attestationID })
 
     process.env = {
       ...originalEnv,
-      ACTIONS_ID_TOKEN_REQUEST_URL: tokenURL,
-      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'token'
+      ACTIONS_ID_TOKEN_REQUEST_URL: `${issuer}${tokenPath}?`,
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'token',
+      GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_REPOSITORY: claims.repository
     }
+
+    // Generate JWT signing key
+    const key = await jose.generateKeyPair('PS256')
+
+    // Create JWK, JWKS, and JWT
+    const kid = '12345'
+    const jwk = await jose.exportJWK(key.publicKey)
+    const jwks = { keys: [{ ...jwk, kid }] }
+    const jwt = await new jose.SignJWT(claims)
+      .setProtectedHeader({ alg: 'PS256', kid })
+      .sign(key.privateKey)
+
+    // Mock OpenID configuration and JWKS endpoints
+    nock(issuer)
+      .get('/.well-known/openid-configuration')
+      .reply(200, { jwks_uri: `${issuer}${jwksPath}` })
+    nock(issuer).get(jwksPath).reply(200, jwks)
+
+    // Mock OIDC token endpoint for populating the provenance
+    nock(issuer).get(tokenPath).query({ audience }).reply(200, { value: jwt })
+
+    nock(issuer)
+      .get(tokenPath)
+      .query({ audience: 'sigstore' })
+      .reply(200, { value: oidcToken })
   })
 
   afterEach(() => {
@@ -124,8 +153,16 @@ describe('action', () => {
       getInputMock.mockImplementation(mockInput(inputs))
       getBooleanInputMock.mockImplementation(() => false)
 
-      await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
-      await mockTSA({ baseURL: TSA_INTERNAL_URL })
+      await mockFulcio({
+        baseURL: 'https://fulcio.githubapp.com',
+        strict: false
+      })
+      await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
+
+      // Mock GH attestations API
+      nock('https://api.github.com')
+        .post(/^\/repos\/.*\/.*\/attestations$/)
+        .reply(201, { id: attestationID })
     })
 
     it('invokes the action w/o error', async () => {
@@ -138,7 +175,7 @@ describe('action', () => {
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching('https://in-toto.io/Statement/v1')
+        expect.stringMatching('https://slsa.dev/provenance/v1')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         2,
@@ -180,8 +217,16 @@ describe('action', () => {
       getInputMock.mockImplementation(mockInput(inputs))
       getBooleanInputMock.mockImplementation(() => false)
 
-      await mockFulcio({ baseURL: FULCIO_PUBLIC_GOOD_URL, strict: false })
-      await mockRekor({ baseURL: REKOR_PUBLIC_GOOD_URL })
+      await mockFulcio({
+        baseURL: 'https://fulcio.sigstore.dev',
+        strict: false
+      })
+      await mockRekor({ baseURL: 'https://rekor.sigstore.dev' })
+
+      // Mock GH attestations API
+      nock('https://api.github.com')
+        .post(/^\/repos\/.*\/.*\/attestations$/)
+        .reply(201, { id: attestationID })
     })
 
     it('invokes the action w/o error', async () => {
@@ -194,7 +239,7 @@ describe('action', () => {
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching('https://in-toto.io/Statement/v1')
+        expect.stringMatching('https://slsa.dev/provenance/v1')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         2,
@@ -226,6 +271,7 @@ describe('action', () => {
   })
 
   describe('when push-to-registry is true', () => {
+    const getCredsSpy = jest.spyOn(oci, 'getRegistryCredentials')
     const ociSpy = jest.spyOn(oci, 'attachArtifactToImage')
 
     const artifactDigest = 'sha256:1234567890'
@@ -235,7 +281,8 @@ describe('action', () => {
       'subject-digest':
         'sha256:7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32',
       'subject-name': 'registry/foo/bar',
-      'github-token': 'gh-token'
+      'github-token': 'gh-token',
+      'push-to-registry': 'true'
     }
 
     beforeEach(async () => {
@@ -250,13 +297,25 @@ describe('action', () => {
       // This is the where we mock the push-to-registry input
       getBooleanInputMock.mockImplementation(() => true)
 
-      await mockFulcio({ baseURL: FULCIO_INTERNAL_URL, strict: false })
-      await mockTSA({ baseURL: TSA_INTERNAL_URL })
+      await mockFulcio({
+        baseURL: 'https://fulcio.githubapp.com',
+        strict: false
+      })
+      await mockTSA({ baseURL: 'https://timestamp.githubapp.com' })
 
+      // Mock GH attestations API
+      nock('https://api.github.com')
+        .post(/^\/repos\/.*\/.*\/attestations$/)
+        .reply(201, { id: attestationID })
+
+      getCredsSpy.mockImplementation(() => ({
+        username: 'foo',
+        password: 'bar'
+      }))
       ociSpy.mockImplementation(async () =>
         Promise.resolve({
           digest: artifactDigest,
-          mediaType: CONTENT_TYPE_OCI_MANIFEST,
+          mediaType: '',
           size: artifactSize
         })
       )
@@ -274,7 +333,7 @@ describe('action', () => {
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         1,
-        expect.stringMatching('https://in-toto.io/Statement/v1')
+        expect.stringMatching('https://slsa.dev/provenance/v1')
       )
       expect(infoMock).toHaveBeenNthCalledWith(
         2,
