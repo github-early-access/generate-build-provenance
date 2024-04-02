@@ -1,14 +1,18 @@
+import {
+  Attestation,
+  attest,
+  buildSLSAProvenancePredicate
+} from '@actions/attest'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { BUNDLE_V02_MEDIA_TYPE } from '@sigstore/bundle'
-import { attachArtifactToImage } from './oci'
-import { generateProvenance, SLSA_PREDICATE_V1_TYPE } from './provenance'
-import { Attestation, signStatement, Visibility } from './sign'
-import { writeAttestation } from './store'
+import { attachArtifactToImage, getRegistryCredentials } from '@sigstore/oci'
+import { SEARCH_PUBLIC_GOOD_URL } from './endpoints'
 import { DIGEST_ALGORITHM, Subject, subjectFromInputs } from './subject'
 
 const COLOR_CYAN = '\x1B[36m'
 const COLOR_DEFAULT = '\x1B[39m'
+
+type Visibility = 'public' | 'private'
 
 /**
  * The main function for the action.
@@ -38,7 +42,7 @@ export async function run(): Promise<void> {
     // Generate attestations for each subject serially
     const attestations: Attestation[] = []
     for (const subject of subjects) {
-      attestations.push(await attest(subject, visibility))
+      attestations.push(await createAttestation(subject, visibility))
     }
 
     // Set bundle as action output, but ONLY IF there is a single attestation
@@ -59,39 +63,46 @@ export async function run(): Promise<void> {
   }
 }
 
-const attest = async (
+const createAttestation = async (
   subject: Subject,
   visibility: Visibility
 ): Promise<Attestation> => {
-  const provenance = generateProvenance(subject, process.env)
-
+  const predicate = await buildSLSAProvenancePredicate()
   core.startGroup(
     highlight(
       `Provenance attestation generated for ${subject.name} (sha256:${subject.digest.sha256})`
     )
   )
-  core.info(JSON.stringify(provenance, null, 2))
+  core.info(
+    JSON.stringify(
+      { predicateType: predicate.type, predicate: predicate.params },
+      null,
+      2
+    )
+  )
   core.endGroup()
 
-  // Sign provenance w/ Sigstore
-  const attestation = await signStatement(provenance, visibility)
-
+  const attestation = await attest({
+    subjectName: subject.name,
+    subjectDigest: subject.digest,
+    predicateType: predicate.type,
+    predicate: predicate.params,
+    token: core.getInput('github-token'),
+    sigstore: visibility === 'public' ? 'public-good' : 'github'
+  })
   core.startGroup(highlight('Attestation signed using ephemeral certificate'))
   core.info(attestation.certificate)
   core.endGroup()
 
-  if (attestation.tlogURL) {
+  if (attestation.tlogID) {
+    const tlogURL = `${SEARCH_PUBLIC_GOOD_URL}?logIndex=${attestation.tlogID}`
     core.info(
       highlight('Attestation signature uploaded to Rekor transparency log')
     )
-    core.info(attestation.tlogURL)
+    core.info(tlogURL)
   }
 
-  const attestationURL = await writeAttestation(
-    attestation.bundle,
-    core.getInput('github-token')
-  )
-
+  const attestationURL = `${github.context.serverUrl}/${github.context.repo.owner}/${github.context.repo.repo}/attestations/${attestation.attestationID}`
   core.info(highlight('Attestation uploaded to repository'))
   core.info(attestationURL)
   core.summary.addHeading('Attestation Created', 3)
@@ -102,13 +113,16 @@ const attest = async (
   core.summary.write()
 
   if (core.getBooleanInput('push-to-registry', { required: false })) {
+    const credentials = getRegistryCredentials(subject.name)
     const artifact = await attachArtifactToImage({
+      credentials,
       imageName: subject.name,
-      imageDigest: `${DIGEST_ALGORITHM}:${subject.digest[DIGEST_ALGORITHM]}`,
-      artifact: JSON.stringify(attestation.bundle),
-      mediaType: BUNDLE_V02_MEDIA_TYPE,
+      imageDigest: subjectDigest(subject),
+      artifact: Buffer.from(JSON.stringify(attestation.bundle)),
+      mediaType: attestation.bundle.mediaType,
       annotations: {
-        'dev.sigstore.bundle/predicateType': SLSA_PREDICATE_V1_TYPE
+        'dev.sigstore.bundle.content': 'dsse-envelope',
+        'dev.sigstore.bundle.predicateType': predicate.type
       }
     })
     core.info(highlight('Attestation uploaded to registry'))
@@ -116,6 +130,13 @@ const attest = async (
   }
 
   return attestation
+}
+
+// Returns the subject's digest as a formatted string of the form
+// "<algorithm>:<digest>".
+const subjectDigest = (subject: Subject): string => {
+  const alg = Object.keys(subject.digest).sort()[0]
+  return `${alg}:${subject.digest[alg]}`
 }
 
 const highlight = (str: string): string => `${COLOR_CYAN}${str}${COLOR_DEFAULT}`
