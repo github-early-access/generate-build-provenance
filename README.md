@@ -13,11 +13,12 @@ attest,
    ```yaml
    permissions:
      id-token: write
-     contents: write
+     attestations: write
+     contents: read # optional, usually required
    ```
 
    The `id-token` permission gives the action the ability to mint the OIDC token
-   necessary to request a Sigstore signing certificate. The `contents`
+   necessary to request a Sigstore signing certificate. The `attestations`
    permission is necessary to persist the attestation.
 
    > **NOTE**: The set of required permissions will be refined in a future
@@ -167,7 +168,8 @@ jobs:
   build:
     permissions:
       id-token: write
-      contents: write
+      attestations: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -195,7 +197,8 @@ jobs:
   build:
     permissions:
       id-token: write
-      contents: write
+      attestations: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -247,7 +250,8 @@ jobs:
     permissions:
       id-token: write
       packages: write
-      contents: write
+      attestations: write
+      contents: read
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
