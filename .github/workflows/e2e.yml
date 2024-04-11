@@ -14,7 +14,8 @@ jobs:
     name: Publish/Verify (Container Image)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      attestations: write
+      contents: read
       id-token: write
     services:
       registry:
