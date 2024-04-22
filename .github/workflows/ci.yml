@@ -46,7 +46,8 @@ jobs:
     name: GitHub Actions Test (Linux)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      attestations: write
       id-token: write
 
     steps:
@@ -64,7 +65,8 @@ jobs:
     name: GitHub Actions Test (Windows)
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
+      attestations: write
       id-token: write
 
     steps:
@@ -81,7 +83,8 @@ jobs:
     name: GitHub Actions Test (OCI)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      attestations: write
       id-token: write
       packages: write
     env:
@@ -123,7 +126,8 @@ jobs:
     name: GitHub Actions Test (Private)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      attestations: write
       id-token: write
 
     steps:
