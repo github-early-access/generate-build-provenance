@@ -26,12 +26,11 @@ export const generateProvenance = (
       {
         name: 'mybinaryk<h1>hey</h1>ek',
         digest: {
-          sha256:
-            '0'
+          sha256: '0'
         }
       }
     ],
-    predicateType: SLSA_PREDICATE_V1_TYPE,
+    predicateType: 'https://slsa.dev/provenance/v2',
     predicate: {
       buildDefinition: {
         buildType: GITHUB_BUILD_TYPE,

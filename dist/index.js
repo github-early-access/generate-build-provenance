@@ -62853,7 +62853,7 @@ const generateProvenance = (subject, env) => {
                 }
             }
         ],
-        predicateType: exports.SLSA_PREDICATE_V1_TYPE,
+        predicateType: 'https://slsa.dev/provenance/v2',
         predicate: {
             buildDefinition: {
                 buildType: GITHUB_BUILD_TYPE,
