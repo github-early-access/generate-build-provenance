@@ -12,14 +12,19 @@ The inputs to the `attest-build-provenance` action are identical to
 `generate-build-provenance`, so migrating to the new version is as simple as
 updating the `uses:` value in your workflows to reference the new name:
 
-```
+```text
 github-early-access/generate-build-provenance@main
 ```
+
 becomes
-```
+
+```text
 actions/attest-build-provenance@v1
 ```
 
+Attestations generated with the new action use a newer version of the Sigstore
+[bundle format][5] (v0.3.1 vs v0.2.1) and require version [2.49.0][7] or later
+of the `gh` CLI to verify.
 
 ## Usage
 
@@ -305,3 +310,4 @@ jobs:
 [5]:
   https://github.com/sigstore/protobuf-specs/blob/main/protos/sigstore_bundle.proto
 [6]: https://github.com/actions/toolkit/tree/main/packages/glob#patterns
+[7]: https://github.com/cli/cli/releases/tag/v2.49.0
