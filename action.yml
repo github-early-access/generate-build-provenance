@@ -37,7 +37,27 @@ outputs:
     description: >
       The JSON-serialized Sigstore bundle containing the signed provenance
       statement and related verification material.
+    value: ${{ steps.translate-output.outputs.bundle }}
 
 runs:
-  using: node20
-  main: dist/index.js
+  using: 'composite'
+  steps:
+    - uses: actions/attest-build-provenance@v1
+      id: attest
+      with:
+        subject-path: ${{ inputs.subject-path }}
+        subject-digest: ${{ inputs.subject-digest }}
+        subject-name: ${{ inputs.subject-name }}
+        push-to-registry: ${{ inputs.push-to-registry }}
+        github-token: ${{ inputs.github-token }}
+    - id: translate-output
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        read -r line < ${{ steps.attest.outputs.bundle-path }}
+        echo "bundle=$line" >> $GITHUB_OUTPUT
+    - id: upgrade-notice
+      shell: bash
+      run: |
+        echo "### Deprecation Notice" >> $GITHUB_STEP_SUMMARY
+        echo "Please migrate from \`github-early-access/generate-build-provenance\` to \`actions/attest-build-provenance\`" >> $GITHUB_STEP_SUMMARY
